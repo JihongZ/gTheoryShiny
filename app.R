@@ -57,7 +57,7 @@ ui <- navbarPage(
                 fileInput("file", label = h3("Choose CSV File"), accept = ".csv"),
                 p("Notice: your data should have TAG/ID in first 2 rows"),
                 verbatimTextOutput("newNotificaion"),
-                checkboxInput("isHeaderIncluded", "你的CSV有列名字吗?", TRUE),
+                checkboxInput("isHeaderIncluded", "Have header or not?", TRUE),
                 checkboxInput("isIDIncluded", "Column 1 is Subject ID?", TRUE),
                 hr(),
                 ## 设定tag/ID前缀和标签
@@ -85,12 +85,6 @@ ui <- navbarPage(
                 p("Control facets/outcome："),
                 uiOutput("selectedMultipleFacets"),
                 uiOutput("selectedOutcome"),
-                # hr(),
-                # p("推荐的概化理论模型为："),
-                # textOutput("recommFormular"),
-                # ## 运行推荐模型
-                # actionButton("runRecommModel", "运行gstudy"),
-                # actionButton("runRecommModelDstudy", "运行dstudy"),
             ),
             # Show a plot of the generated distribution
             mainPanel(
@@ -108,8 +102,11 @@ ui <- navbarPage(
             sidebarPanel(
                 strong("Recommended formula："),
                 textOutput("recommFormular"),
-                textInput("selfFormular", "User-specified formula: ", placeholder = "Default: recommeded formula"),
-                
+                textInput("selfFormular", "User-specified formula: ", 
+                          placeholder = "Default: recommeded formula"),
+                selectInput("linkFunc", label = "Link Function:", 
+                            choices = c("identity", "logit", "probit", "poisson", "inverse gamma"),
+                            selected = "identity"),
                 hr(),
                 ## 运行gstudy
                 h3("G-study："),
@@ -128,7 +125,7 @@ ui <- navbarPage(
                 ## 运行dstudy
                 h3("D-study："),
                 ### 选择要修改的facet
-                uiOutput("selectedFacet"), #选择一个facet
+                uiOutput("selectedFacetMenu"), #选择一个facet
                 uiOutput("selectedFacetLevels"), #选择factor levels
                 conditionalPanel(condition = "input.runRecommModel >= 1", 
                                  actionButton(inputId = "confirmFacetLevel", label = "Confirm")),
@@ -327,17 +324,12 @@ server <- function(input, output, session) {
          outcome  <- selectedOutcome()
          datLong() |> 
              group_by(across(facets)) |> 
-             summarise(
-                 `Sample Size (Outcome)` = n_distinct(.data[[outcome]])
-             )
+             summarise(`Sample Size (Outcome)` = n_distinct(.data[[outcome]]))
      })
      
      output$nestedStrucTable <- renderDT({
          nestedStrc()
      })
-     
-
-
      
 # 运行推荐模型 ------------------------------------------------------------------
      output$recommFormular <- renderText({
@@ -346,6 +338,7 @@ server <- function(input, output, session) {
      
      
      gstudyResult <- eventReactive(input$runRecommModel, {
+         nFacet <- NULL
          dat <- datLong()
          dat[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
          dat[c("ID", selectedFacet())] <- lapply(dat[c("ID", selectedFacet())], as.factor)
@@ -357,7 +350,7 @@ server <- function(input, output, session) {
          }
         randomEffectEstimate <- ranef(lme4.res)
         randomEffectLevel <- lapply(lapply(dat, unique), length)
-        n <<- unlist(randomEffectLevel[!names(randomEffectLevel) %in% c(unit, outcome)])
+        nFacet <<- unlist(randomEffectLevel[selectedFacet()])
         gstudy(lme4.res)
      })
      
@@ -366,15 +359,15 @@ server <- function(input, output, session) {
          dat[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
          dat[c("ID", selectedFacet())] <- lapply(dat[c("ID", selectedFacet())], as.factor)
          
-         
          if (input$selfFormular == "") {
            lme4.res <- lmer(data = dat, formula = as.formula(gtheoryFormula()))
          }else{
            lme4.res <- lmer(data = dat, formula = as.formula(makehardformular(input$selfFormular)))
          }
          gstudy.res <- gstudy(lme4.res)
-         dstudy(x = gstudy.res, n = n, unit = unit)
+         dstudy(x = gstudy.res, n = nFacet, unit = unit)
      })
+     
      ## with Bootstrapping
      gstudyResultBoot <- eventReactive(input$runRecommModelBoot, {
        dat <- datLong()
@@ -388,7 +381,7 @@ server <- function(input, output, session) {
          lme4.res <- lmer(data = dat, formula = as.formula(makehardformular(input$selfFormular)))
        }
        
-       boot.gstudy <-
+       boot.gstudy <<-
          lme4::bootMer(
            lme4.res,
            gstudy.forboot,
@@ -398,6 +391,7 @@ server <- function(input, output, session) {
            parallel = "snow",
            ncpus = 2
          ) 
+       
        boot.gstudy.res <- cbind(gstudy.res$gstudy.out, t(boot.gstudy$t))
        boot.gstudy.res
        
@@ -408,15 +402,14 @@ server <- function(input, output, session) {
        dat[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
        dat[c("ID", selectedFacet())] <- lapply(dat[c("ID", selectedFacet())], as.factor)
        gstudy.res <- gstudyResult()
-       dstudy.res <- dstudyResult()
-       
-       gstudy.res <- gstudyResult()
        boot.gstudy.res <- gstudyResultBoot()
+       dstudy.res_boot <- dstudyResult() # placeholder
+       
        boot.dstudy.res <- NULL
        for(i in 1:nboot) {
          temp <- gstudy.res
          temp[1]$gstudy.out[, 2] <- boot.gstudy.res[, -(1:3)][, i]
-         temp.dstudy <- dstudy(temp, n, unit)
+         temp.dstudy <- dstudy(temp, nFacet, unit)
          
          boot.dstudy.res <- rbind(
            boot.dstudy.res,
@@ -429,35 +422,40 @@ server <- function(input, output, session) {
            )
          )   
        }
-       dstudy.res.CI<-t(apply(t(boot.dstudy.res),1,function(x){quantile(x, probs = c(.025, .975))}))
-       
+       dstudy.res.CI<-t(apply(t(boot.dstudy.res), 1,
+                              function(x){quantile(x, probs = c(.025, .975))}))
+       names(dstudy.res.CI) <- c("2.5%", "97.5%")
        
        # beautify output
        dstudy.res_boot$dcoef[2] <-
          dstudy.res.CI[nrow(dstudy.res.CI), 1]
        dstudy.res_boot$dcoef[3] <- dstudy.res.CI[nrow(dstudy.res.CI), 2]
        names(dstudy.res_boot$dcoef) <- c("Est", "2.5%", "97.5%")
-       dstudy.res_boot$gcoef[2] <-
-         dstudy.res.CI[nrow(dstudy.res.CI) - 1, 1]
+       
+       
+       dstudy.res_boot$gcoef[2] <-dstudy.res.CI[nrow(dstudy.res.CI) - 1, 1]
        dstudy.res_boot$gcoef[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 1, 2]
        names(dstudy.res_boot$gcoef) <- c("Est", "2.5%", "97.5%")
-       dstudy.res_boot$absvar[2] <-
-         dstudy.res.CI[nrow(dstudy.res.CI) - 2, 1]
+       
+       dstudy.res_boot$absvar[2] <- dstudy.res.CI[nrow(dstudy.res.CI) - 2, 1]
        dstudy.res_boot$absvar[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 2, 2]
        names(dstudy.res_boot$absvar) <- c("Est", "2.5%", "97.5%")
+       
        dstudy.res_boot$relvar[2] <-
          dstudy.res.CI[nrow(dstudy.res.CI) - 3, 1]
        dstudy.res_boot$relvar[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 3, 2]
        names(dstudy.res_boot$relvar) <- c("Est", "2.5%", "97.5%")
        dstudy.res_boot$ds.df <-
          cbind(dstudy.res_boot$ds.df, dstudy.res.CI[1:(-4 + nrow(dstudy.res.CI)), ])
+       
+       # output
        dstudy.res_boot
      })
      
      
      
-     ###################### dstudy:显示facets的levels
      
+     ###################### dstudy:显示facets的levels
     
      ###################### 打印模型结果
      observeEvent(input$runRecommModel,{
@@ -469,15 +467,16 @@ server <- function(input, output, session) {
          
          ## add UI for 选择facet
          selectedFacetForLevel <- reactive({input$selectedFacetValue})
-         output$selectedFacet <- renderUI({
+         output$selectedFacetMenu <- renderUI({
            allfacets <- selectedFacet()
-           selectInput(inputId = "selectedFacetForLevel", label = "Select the facet to change",
+           selectInput(inputId = "selectedFacet", label = "Select the facet to change",
                        choices = allfacets)
          })
-         observeEvent(input$selectedFacetForLevel, {
+         observeEvent(input$selectedFacet, {
            output$selectedFacetLevels <- renderUI({
-             whichfacet <<- input$selectedFacetForLevel
-             whichValue <<- ifelse(is.null(input$selectedFacetValue), n[whichfacet], selectedFacetForLevel())
+             whichfacet <<- input$selectedFacet
+             whichValue <<-
+               ifelse(is.null(input$selectedFacetValue), nFacet[whichfacet], selectedFacetForLevel())
              sliderInput(
                inputId = "selectedFacetValue",
                label = "level: ",
@@ -488,7 +487,7 @@ server <- function(input, output, session) {
            })
          })
          observeEvent(input$confirmFacetLevel, {
-           n[whichfacet] <<- whichValue
+           nFacet[whichfacet] <<- whichValue
          })
          
          i = 100
@@ -509,7 +508,7 @@ server <- function(input, output, session) {
              print.dStudy(dstudy.out)
          })
          output$updatedN <- renderPrint( {
-           n
+           nFacet
          })
          i = 100
          updateProgressBar(
@@ -517,30 +516,15 @@ server <- function(input, output, session) {
            status = "success",
            value = i
          )
-         # output$recommModelDStudyStats <- renderDT({
-         #     dstudy.out <- dstudyResult()
-         #     indices <- c("var.universe",
-         #     "generalizability",
-         #     "var.error.rel",
-         #     "sem.rel",
-         #     "see.rel",
-         #     "dependability",
-         #     "var.error.abs",
-         #     "sem.abs",
-         #     "see.abs")
-         #     dt <- data.frame(do.call("rbind",dstudy.out[indices]))
-         #     colnames(dt) <- "statistics"
-         #     dt$statistics <- round(dt$statistics, 3)
-         #     dt
-         # })
      }
     )
     
     # observe Bootstrapping and output 
     observeEvent(input$runRecommModelBoot,{
       output$recommModelGStudyBootResult <- renderPrint( {
-        gstudy.res_boot <- gstudyResult()
+        gstudy.res_boot <- gstudyResult() # place holder
         boot.gstudy.res <- gstudyResultBoot()
+        
         
         # calculate bootstrap CI
         gstudy.res.CI <-
@@ -548,7 +532,7 @@ server <- function(input, output, session) {
             quantile(x, probs = c(.025, .975))
           }))
         
-        # output
+        # # output
         gstudy.res_boot$gstudy.out <-
           cbind(gstudy.res_boot$gstudy.out, gstudy.res.CI)
         gstudy.res_boot$gstudy.out
