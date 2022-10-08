@@ -1,11 +1,12 @@
 {
   "input": {
+    "confirmFacetLevel": 0,
     "file": {
       "name": [
-        "exampleDTThreeRow.csv"
+        "Brennan.3.2Wide.csv"
       ],
       "size": [
-        96
+        926
       ],
       "type": [
         "text/csv"
@@ -16,8 +17,9 @@
     },
     "isHeaderIncluded": true,
     "isIDIncluded": true,
-    "nRows": "3",
-    "preFix": "T;R;I",
+    "linkFunc": "identity",
+    "nRows": "2",
+    "preFix": "T;R",
     "rawDataTable_cell_clicked": {
 
     },
@@ -30,14 +32,26 @@
       2,
       3,
       4,
-      5
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
     ],
     "rawDataTable_rows_current": [
       1,
       2,
       3,
       4,
-      5
+      5,
+      6,
+      7,
+      8,
+      9,
+      10
     ],
     "rawDataTable_rows_selected": null,
     "rawDataTable_search": "",
@@ -107,10 +121,87 @@
             "regex": false,
             "caseInsensitive": true
           }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
+        },
+        {
+          "visible": true,
+          "search": {
+            "search": "",
+            "smart": true,
+            "regex": false,
+            "caseInsensitive": true
+          }
         }
       ]
     },
-    "TagNames": "Class;Rater;Item",
+    "runRecommModel": 0,
+    "runRecommModelBoot": 0,
+    "runRecommModelDstudy": 0,
+    "runRecommModelDstudyBoot": 0,
+    "selfFormular": "",
+    "TagNames": "Task;Rater",
     "transDataTable_cell_clicked": {
 
     },
@@ -126,7 +217,119 @@
       5,
       6,
       7,
-      8
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      106,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      116,
+      117,
+      118,
+      119,
+      120
     ],
     "transDataTable_rows_current": [
       1,
@@ -136,7 +339,9 @@
       5,
       6,
       7,
-      8
+      8,
+      9,
+      10
     ],
     "transDataTable_rows_selected": null,
     "transDataTable_search": "",
@@ -197,24 +402,14 @@
             "regex": false,
             "caseInsensitive": true
           }
-        },
-        {
-          "visible": true,
-          "search": {
-            "search": "",
-            "smart": true,
-            "regex": false,
-            "caseInsensitive": true
-          }
         }
       ]
     },
     "transform": 1
   },
   "output": {
-    "newNotificaion": "",
     "nRows": {
-      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"nRows-label\" for=\"nRows\">多少行是tag/ID<\/label>\n  <div>\n    <select id=\"nRows\"><option value=\"1\">1<\/option>\n<option value=\"2\">2<\/option>\n<option value=\"3\" selected>3<\/option>\n<option value=\"4\">4<\/option>\n<option value=\"5\">5<\/option><\/select>\n    <script type=\"application/json\" data-for=\"nRows\" data-nonempty=\"\">{\"plugins\":[\"selectize-plugin-a11y\"]}<\/script>\n  <\/div>\n<\/div>",
+      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"nRows-label\" for=\"nRows\">多少行是tag/ID<\/label>\n  <div>\n    <select id=\"nRows\"><option value=\"1\">1<\/option>\n<option value=\"2\" selected>2<\/option>\n<option value=\"3\">3<\/option>\n<option value=\"4\">4<\/option>\n<option value=\"5\">5<\/option>\n<option value=\"6\">6<\/option>\n<option value=\"7\">7<\/option>\n<option value=\"8\">8<\/option>\n<option value=\"9\">9<\/option>\n<option value=\"10\">10<\/option>\n<option value=\"11\">11<\/option>\n<option value=\"12\">12<\/option><\/select>\n    <script type=\"application/json\" data-for=\"nRows\" data-nonempty=\"\">{\"plugins\":[\"selectize-plugin-a11y\"]}<\/script>\n  <\/div>\n<\/div>",
       "deps": [
         {
           "name": "selectize",
@@ -235,7 +430,7 @@
       ]
     },
     "preFix": {
-      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"preFix-label\" for=\"preFix\">tag/ID前缀（比如A;B;C）<\/label>\n  <input id=\"preFix\" type=\"text\" class=\"form-control\" value=\"T;R;I\"/>\n<\/div>",
+      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"preFix-label\" for=\"preFix\">tag/ID前缀（比如A;B;C）<\/label>\n  <input id=\"preFix\" type=\"text\" class=\"form-control\" value=\"T;R\"/>\n<\/div>",
       "deps": [
 
       ]
@@ -244,9 +439,13 @@
       "x": {
         "filter": "none",
         "vertical": false,
-        "container": "<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>V1<\/th>\n      <th>V2<\/th>\n      <th>V3<\/th>\n      <th>V4<\/th>\n      <th>V5<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>",
+        "container": "<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>Person<\/th>\n      <th>Task1.Rater1<\/th>\n      <th>Task1.Rater2<\/th>\n      <th>Task1.Rater3<\/th>\n      <th>Task1.Rater4<\/th>\n      <th>Task2.Rater5<\/th>\n      <th>Task2.Rater6<\/th>\n      <th>Task2.Rater7<\/th>\n      <th>Task2.Rater8<\/th>\n      <th>Task3.Rater9<\/th>\n      <th>Task3.Rater10<\/th>\n      <th>Task3.Rater11<\/th>\n      <th>Task3.Rater12<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>",
         "options": {
           "columnDefs": [
+            {
+              "className": "dt-right",
+              "targets": 1
+            },
             {
               "orderable": false,
               "targets": 0
@@ -324,7 +523,7 @@
       ]
     },
     "TagNames": {
-      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"TagNames-label\" for=\"TagNames\">tag/ID的column名字(比如Class;Rater;Item)<\/label>\n  <input id=\"TagNames\" type=\"text\" class=\"form-control\" value=\"Class;Rater;Item\"/>\n<\/div>",
+      "html": "<div class=\"form-group shiny-input-container\">\n  <label class=\"control-label\" id=\"TagNames-label\" for=\"TagNames\">tag/ID的column名字(比如Class;Rater;Item)<\/label>\n  <input id=\"TagNames\" type=\"text\" class=\"form-control\" value=\"Task;Rater\"/>\n<\/div>",
       "deps": [
 
       ]
@@ -333,9 +532,13 @@
       "x": {
         "filter": "none",
         "vertical": false,
-        "container": "<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>ID<\/th>\n      <th>Class<\/th>\n      <th>Rater<\/th>\n      <th>Item<\/th>\n      <th>Score<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>",
+        "container": "<table class=\"display\">\n  <thead>\n    <tr>\n      <th> <\/th>\n      <th>ID<\/th>\n      <th>Task<\/th>\n      <th>Rater<\/th>\n      <th>Score<\/th>\n    <\/tr>\n  <\/thead>\n<\/table>",
         "options": {
           "columnDefs": [
+            {
+              "className": "dt-right",
+              "targets": 1
+            },
             {
               "orderable": false,
               "targets": 0

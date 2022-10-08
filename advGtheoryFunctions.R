@@ -270,11 +270,26 @@ dstudy.forboot <- function(x, n, unit) {
 #' @export
 
 print.dStudy <- function(x, ...){
-  colnames(x$ds.df) <- c("Source", "Est.Variance", "N", "Ratio of Var:N")
+  if(length(colnames(x$ds.df))==4){
+    colnames(x$ds.df) <- c("Source", "Est.Variance", "N", "Est.(Var/N)")
+    cat("\nThe generalizability coefficient is:", x$gcoef)
+    cat(".\nThe dependability coefficient is: ", x$dcoef,sep = "")
+    cat(".\nThe relative error  is: ", x$relvar, sep = "")
+    cat(".\nThe absolute error is: ", x$absvar, sep = "")
+  }else{colnames(x$ds.df) <- c("Source", "Est.Variance", "N", "Est.(Var/N)","2.5%","97.5%")
+  cat("\nThe generalizability coefficient is:", x$gcoef[1],"; Its 95% CI is [",x$gcoef[2],",",x$gcoef[3],"]",sep='')
+  cat(".\nThe dependability coefficient is: ", x$dcoef[1],"; Its 95% CI is [",x$dcoef[2],",",x$dcoef[3], "]",sep='')
+  cat(".\nThe relative error  is: ", x$relvar[1],"; Its 95% CI is [",x$relvar[2],",",x$relvar[3],    "]",sep='')
+  cat(".\nThe absolute error is: ", x$absvar[1],".; Its 95% CI is [",x$absvar[2],",",x$absvar[3],    "]",sep='')
+  
+  }
+  cat(".\n")
+  cat(".\n")
   print(x$ds.df)
-  cat("\nThe generalizability coefficient is:", x$gcoef)
-  cat(".\nThe dependability coefficient is: ", x$dcoef,".", sep = "")
+  
 }
+
+# print.dStudy(dstudy.res_boot)
 
 
 makeeasyformular <- function(formular) {
