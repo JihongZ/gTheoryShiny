@@ -22,10 +22,11 @@
 # unit="Person"
 # outcome='Score'
 # nboot=3
-
-#variable  n = c("Rater" = 2, "Task" = 5)
+# 
+# #variable  
+# n = c("Rater" = 2, "Task" = 5)
 # lme4.res<-lmer(Score ~ (1 | Person) + (1 | Task) +(1 | Rater:Task) + (1 | Person:Task),data = Data)
-#res
+# #res
 # randomEffectEstimate <- ranef(lme4.res) # Task 1: 做成csv用来output
 # randomEffectLevel <- lapply(lapply(Data, unique), length)
 # n = unlist(randomEffectLevel[!names(randomEffectLevel) %in% c(unit, outcome)]) # Task 2: 1 default 2 user setting
@@ -60,6 +61,24 @@ gstudy <- function(x, fixed = NULL) {
 
 #variable
 # gstudy.res <- gstudy(lme4.res)
+cbind_dif <- function(x = list()){
+  # Find max length
+  max_length <- max(unlist(lapply(x, length)))
+  
+  # Set length of each vector as
+  res <- lapply(x, function(x){
+    length(x) <- max_length
+    return(x)
+  })
+  
+  return(as.data.frame(res))
+}
+extractTheta <- function(x) {
+  est <- coef(x)
+  est <- sapply(est, function(x) unlist(x))
+  cbind_dif(est)
+}
+
 
 #function
 gstudy.forboot <- function(x, fixed = NULL) {

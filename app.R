@@ -145,6 +145,9 @@ ui <- navbarPage(
                 ),
                 ### 下载按钮
                 conditionalPanel(condition = "input.runRecommModel >=1",
+                                 downloadButton("downloadGstudyTheta", "Download theta estimates")
+                ),
+                conditionalPanel(condition = "input.runRecommModel >=1",
                                  downloadButton("downloadGstudyResult", "Download gstudy result")
                                  ),
                 conditionalPanel(condition = "input.runRecommModelBoot >=1",
@@ -386,9 +389,9 @@ server <- function(input, output, session) {
          datG[c(input$selectedID, selectedFacet())] <- lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
          if (input$selfFormular == "") {
              formulaRecomm <- as.formula(gtheoryFormula())
-             lme4.res <- lmer(data = datG, formula = formulaRecomm)
+             lme4.res <<- lmer(data = datG, formula = formulaRecomm)
          }else{
-             lme4.res <- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
+             lme4.res <<- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
          }
         randomEffectEstimate <- ranef(lme4.res)
         randomEffectLevel <- lapply(lapply(datG, unique), length)
@@ -549,6 +552,13 @@ server <- function(input, output, session) {
            filename = "gstudyResult.csv",
            content = function(file) {
              write.csv(gstudyResult()$gstudy.out, file, row.names = FALSE)
+           }
+         )
+         ## 可下载的表格 downloadGstudyTheta
+         output$downloadGstudyTheta <- downloadHandler(
+           filename = "thetaEstimates.csv",
+           content = function(file) {
+             write.csv(extractTheta(lme4.res), file, row.names = FALSE)
            }
          )
      }
