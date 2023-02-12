@@ -110,7 +110,7 @@ ui <- navbarPage(
       ),
       # Show a plot of the generated distribution
       mainPanel(
-        h4("You recommend formula: "),
+        h4("Recommended default model: "),
         textOutput("recommFormular"),
         tags$head(
           tags$style(
