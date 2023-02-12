@@ -26,7 +26,6 @@ source("library_load.R")
 source("advGtheoryFunctions.R")
 nboot = 200
 
-
 # Define UI for application that draws a histogram
 ui <- navbarPage(
     "G-theory Data Explorer", # title
@@ -49,13 +48,14 @@ ui <- navbarPage(
                h4("Step 2: Specify each column's type"),
                p("Click ", em("Data Structure"), " tab. Select ", strong("Person"), " for ", em("which column represents ID"), " question."),
                p("Then check ", strong("Subset, Item, Rater, Ocasion"), " for ", em("Which column(s) represent facets"), " question."),
-               p("Finally select ", strong("Ocasion"), " for ", em("Which column represents outcome"), " question."),
+               p("Finally select ", strong("Score"), " for ", em("Which column represents outcome"), " question."),
                
                h4("Step 3: Run data analysis"),
                p("Click ", em("Data Analysis"), " tab. You will notice the recommended formula for gtheory has been given to you. You can also specify your formula in ", em("User-specified formula"), " section. Choose link function for your model (defaulty is identity link). Finally decise on how many boostrap iterations for bootstrapping standard diviation estimation."),
-               
-               p("Chick ", strong("gstudy estimate"), " button to print gstudy results. A button called ", strong("Download gstudy result"), " will pop up. Click that button to download the results into local machine.")
+               p("Chick ", strong("gstudy estimate"), " button to print gstudy results. A button called ", strong("Download gstudy result"), " will pop up. Click that button to download the results into local machine."),
               
+               h3("Updates (2023-02-12):"),
+               p("This app has the function to estimate the fixed effects of covariates. To use this function, check", em("covariates"), "in Data Structure tab page. Then, the fixed effects estimates will be printed after users click ", em("gtheory estimate"), "button in Data Analysis tag page.")
              )
     ),
 
@@ -69,11 +69,11 @@ ui <- navbarPage(
                 verbatimTextOutput("newNotificaion"),
                 
                 h4("Data property:"),
-                checkboxInput("isLongFormat", "long-format", FALSE),
+                checkboxInput("isLongFormat", "long-format", TRUE), # ask if the data is long-format or wide-format
                 checkboxInput("isHeaderIncluded", "include header", TRUE),
                 
                 hr(),
-                h4("Wide to Long Transformation:"),
+                h4("Long to Wide Transformation:"),
                 ## 设定tag/ID前缀和标签
                 conditionalPanel(condition = "input.isLongFormat == 0", 
                                  uiOutput("nRows"),
@@ -95,30 +95,43 @@ ui <- navbarPage(
 # Tab Page 2: Check Data Structure ----------------------------------------
     tabPanel("Data Structure",
     # Sidebar with a slider input for number of bins 
-        sidebarLayout(
-            sidebarPanel(
-                p("Control facets/outcome："),
-                uiOutput("selectedID"),
-                uiOutput("selectedMultipleFacets"),
-                uiOutput("selectedOutcome"),
-                actionButton("variableSettingConfirm", "confirm")
-            ),
-            # Show a plot of the generated distribution
-            mainPanel(
-               h4("Structural Table:"),
-               DTOutput("nestedStrucTable"),
-               h4("Summary Table:"),
-               DTOutput("factorNestTable"),
-            )
-        ),
+    sidebarLayout(
+      sidebarPanel(
+        p("Control facets/outcome："),
+        # show selection area for ID
+        uiOutput("selectedID"),
+        # show selection area for facets
+        uiOutput("selectedMultipleFacets"),
+        # show selection area for covariates
+        uiOutput("selectedCovariates"),
+        # show selection area for outcome
+        uiOutput("selectedOutcome"),
+        actionButton("variableSettingConfirm", "confirm")
+      ),
+      # Show a plot of the generated distribution
+      mainPanel(
+        h4("You recommend formula: "),
+        textOutput("recommFormular"),
+        tags$head(
+          tags$style(
+            "#recommFormular{color:red; font-size:14px; font-style:bold;
+            overflow-y:scroll; max-height: 50px; background: ghostwhite;}"
+          )
+        ), 
+        h4("Structural Table:"),
+        DTOutput("nestedStrucTable"),
+        h4("Summary Table:"),
+        DTOutput("factorNestTable"),
+      )
+    ), 
     ),
 
 # Tab Page 3: Check Data Analysis ----------------------------------------
     tabPanel("Data Analysis",
         sidebarLayout(
             sidebarPanel(
-                strong("Recommended formula："),
-                textOutput("recommFormular"),
+                # strong("Recommended formula："),
+                # textOutput("recommFormular"),
                 textInput("selfFormular", "User-specified formula: ", 
                           placeholder = "Default: recommeded formula"),
                 selectInput("linkFunc", label = "Link Function:", 
@@ -176,10 +189,13 @@ ui <- navbarPage(
                                  downloadButton("downloadDstudyBootResult", 
                                                 "Download bootstrap result")),
             ),    
-            # output panel: gstudy / dstudy
+            # output panel: gstudy / dstudy ----
             mainPanel(
                 conditionalPanel(condition = "input.runRecommModel >= 1",
                                  h4("G-study Output："),
+                                 h5("Fixed Effects Output："),
+                                 verbatimTextOutput("recommModelFixedEffectResult"), 
+                                 h5("Random Effects Output："),
                                  verbatimTextOutput("recommModelGStudyResult")
                 ),
                 # gstudy with bootstrapping SD
@@ -281,86 +297,124 @@ server <- function(input, output, session) {
     
 
 # Sever for tag page 2 ----------------------------------------------------
-# Reactive values
+
+## Reaction values: Facet / Covariates / Outcome ----
+
     unit = reactive({input$selectedID})
     selectedFacet = reactive({input$selectedMultipleFacets})
+    selectedCovariates = reactive({input$selectedCovariates})
     selectedOutcome = reactive({input$selectedOutcome})
-    nestedStrc <- reactive({
-        TagNames <- selectedFacet()
-        TagPairs <- as.data.frame(t(combn(TagNames, 2)))
-        colnames(TagPairs) <- c("f1", "f2")
-        NestedOrCrossed = rep(NA, nrow(TagPairs))
-        for (pair in 1:nrow(TagPairs)) { # pair = TagPairs[2,]
-            whichpair = TagPairs[pair,]
-            isNested <- sjmisc::is_nested(dat[[whichpair[[1]]]], dat[[whichpair[[2]]]])
-            NestedOrCrossed[pair] = ifelse(isNested, "Nested", "Crossed")
-        }
-        nestedStrcTable = TagPairs
-        nestedStrcTable$NestedOrCrossed = NestedOrCrossed
-        nestedStrcTable
-    })
+    
     # 选择ID
     output$selectedID <- renderUI({
-      selectInput("selectedID",
-                  "Which column represents ID:",
-                  choices = colnames(dat),
-                  selected = colnames(dat)[1])
+      selectInput(
+        "selectedID",
+        "Which column represents ID:",
+        choices = colnames(dat),
+        selected = colnames(dat)[1]
+      )
     })
     
     # 选择facet
     output$selectedMultipleFacets <- renderUI({
-      checkboxGroupInput("selectedMultipleFacets",
-                         "Which column(s) represent facets:",
-                         choices = colnames(dat),
-                         # str_split(TagNamesText(), ";")[[1]]
-                         selected = NULL
+      checkboxGroupInput(
+        "selectedMultipleFacets",
+        "Which column(s) represent facets:",
+        choices = colnames(dat),
+        selected = colnames(dat)
+      )
+    })
+    
+    # 选择covariates
+    output$selectedCovariates <- renderUI({
+      checkboxGroupInput(
+        "selectedCovariates",
+        "Which column(s) represent covariates:",
+        choices = colnames(dat),
+        selected = colnames(dat)
       )
     })
     
     # 选择outcome
     output$selectedOutcome <- renderUI({
-      selectInput("selectedOutcome",
-                  "Which column represents outcome:",
-                  choices = colnames(dat),
-                  selected = colnames(dat)[ncol(dat)])
+      selectInput(
+        "selectedOutcome",
+        "Which column represents outcome:",
+        choices = colnames(dat),
+        selected = ifelse("Score" %in% colnames(dat), "Score", colnames(dat)[ncol(dat)])
+      )
     })
     
-    # 将用户输入的公式转换成gtheory认可的公式
+    ## Generate table illustrating nested design: crossed or nested
+    nestedStrc <- reactive({
+      TagNames <- selectedFacet()
+      TagPairs <- as.data.frame(t(combn(TagNames, 2)))
+      colnames(TagPairs) <- c("f1", "f2")
+      NestedOrCrossed = rep(NA, nrow(TagPairs))
+      for (pair in 1:nrow(TagPairs)) {
+        # pair = TagPairs[2,]
+        whichpair = TagPairs[pair, ]
+        isNested <-
+          sjmisc::is_nested(dat[[whichpair[[1]]]], dat[[whichpair[[2]]]])
+        NestedOrCrossed[pair] = ifelse(isNested, "Nested", "Crossed")
+      }
+      nestedStrcTable = TagPairs
+      nestedStrcTable$NestedOrCrossed = NestedOrCrossed
+      nestedStrcTable
+    })
+    
+    
+    ## 将用户输入的公式转换成gtheory认可的公式 ----
     gtheoryFormula <- reactive({
-        nestedStrcTable <- nestedStrc()
-        formularPredictors <- NULL
-        for (r in 1:nrow(nestedStrcTable)) {
-            if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
-              formularPredictors <- c( formularPredictors, paste0("(1 | ", nestedStrcTable[r, 1:2], ")") )
-            }
-            if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
-                tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
-                nested <- !any(apply(tab, 1, function(x) sum(x != 0) > 1))
-                if (nested) { 
-                  formularPredictors <-
-                        c(formularPredictors,
-                               paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
-                               paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
-                               paste0("(1 | ", paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]), ")")
-                        )
-                }else{
-                  formularPredictors <-
-                        c(formularPredictors,
-                          paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
-                          paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
-                          paste0("(1 | ", paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]), ")")
-                          )
-                }
-            }
+      nestedStrcTable <- nestedStrc() # load nested structure
+      formularFacets <- NULL
+      
+      for (r in 1:nrow(nestedStrcTable)) {
+        if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
+          formularFacets <-
+            c(formularFacets,
+              paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
         }
-        formularText <- paste0(unique(formularPredictors), collapse = " + ")
+        if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
+          tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
+          nested <-
+            !any(apply(tab, 1, function(x)
+              sum(x != 0) > 1))
+          if (nested) {
+            formularFacets <-
+              c(
+                formularFacets,
+                paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
+                paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
+                paste0(
+                  "(1 | ",
+                  paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),
+                  ")"
+                )
+              )
+          } else{
+            formularFacets <-
+              c(
+                formularFacets,
+                paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
+                paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
+                paste0(
+                  "(1 | ",
+                  paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]),
+                  ")"
+                )
+              )
+          }
+        }
+      }
+        ## add covariates and facets into the formulate
+        formularText <- paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
         
         paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", formularText)
     })
 
     # Tabset2: 显示表格
     observeEvent(input$variableSettingConfirm, {
-       
        # 表格打印： facet嵌套
        output$nestedStrucTable <- renderDT({
            nestedStrc()
@@ -375,23 +429,28 @@ server <- function(input, output, session) {
        })
     })
 
-# 运行推荐模型 ------------------------------------------------------------------
+# Running recommended model ------------------------------------------------------------------
      output$recommFormular <- renderText({
          makeeasyformular(gtheoryFormula())
      })
-
 
      gstudyResult <- eventReactive(input$runRecommModel, {
          nFacet <- NULL
          datG <- dat
          datG[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
-         datG[c(input$selectedID, selectedFacet())] <- lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
+         datG[c(input$selectedID, selectedFacet())] <-
+           lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
          if (input$selfFormular == "") {
              formulaRecomm <- as.formula(gtheoryFormula())
              lme4.res <<- lmer(data = datG, formula = formulaRecomm)
          }else{
-             lme4.res <<- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
+           lme4.res <<-
+             lmer(data = datG, 
+                  formula = as.formula(makehardformular(input$selfFormular)))
          }
+        ## fixed effect
+        fixedEffectEstimate <<- fixef(lme4.res)
+        ## Random effects
         randomEffectEstimate <- ranef(lme4.res)
         randomEffectLevel <- lapply(lapply(datG, unique), length)
         nFacet <<- unlist(randomEffectLevel[selectedFacet()])
@@ -507,7 +566,11 @@ server <- function(input, output, session) {
          i = 0
          output$recommModelGStudyResult <- renderPrint( {
              gstudy.out <- gstudyResult()
+             
              gstudy.out$gstudy.out
+         })
+         output$recommModelFixedEffectResult <- renderPrint( {
+           fixedEffectEstimate
          })
 
          ## add UI for 选择facet
