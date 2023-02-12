@@ -17,19 +17,12 @@
 # 【X】 2）boostrap得允许人家设置bootstrap多少次
 # 【X】 3）extract出random effect可供下载
 # 【X】 4）留一个说明页的tab界面用来放instruction或tutorials
-# 【】 5）测试一下其他不同design数据形式下，比如crossed和4个多重nested level，弄几个内置sample dataset可以供人直接下载mock on
+# 【x】 5）测试一下其他不同design数据形式下，比如crossed和4个多重nested level，弄几个内置sample dataset可以供人直接下载mock on
+# 【X】 6）加入covariate的功能
+
 
 rm(list = ls())
-library(shiny)
-library(shinyjs)
-library(shinyWidgets) # for widgets like progress bar
-library(lme4) # for lme modeling
-library(DT) # for data table
-library(markdown) # for better markdown format
-library(sjmisc) # check nested/crossed strucutre
-library(tidyverse) # for better markdown format
-
-
+source("library_load.R")
 source("advGtheoryFunctions.R")
 nboot = 200
 
@@ -60,6 +53,7 @@ ui <- navbarPage(
                
                h4("Step 3: Run data analysis"),
                p("Click ", em("Data Analysis"), " tab. You will notice the recommended formula for gtheory has been given to you. You can also specify your formula in ", em("User-specified formula"), " section. Choose link function for your model (defaulty is identity link). Finally decise on how many boostrap iterations for bootstrapping standard diviation estimation."),
+               
                p("Chick ", strong("gstudy estimate"), " button to print gstudy results. A button called ", strong("Download gstudy result"), " will pop up. Click that button to download the results into local machine.")
               
              )
@@ -73,11 +67,13 @@ ui <- navbarPage(
                 fileInput("file", label = h4("Choose CSV File:"), accept = ".csv", buttonLabel = "Upload..."),
                 p("Notice: If data is wide-format, make sure the first two rows of your data file should be TAG/ID, first column should be subject ID"),
                 verbatimTextOutput("newNotificaion"),
+                
                 h4("Data property:"),
                 checkboxInput("isLongFormat", "long-format", FALSE),
                 checkboxInput("isHeaderIncluded", "include header", TRUE),
                 
                 hr(),
+                h4("Wide to Long Transformation:"),
                 ## 设定tag/ID前缀和标签
                 conditionalPanel(condition = "input.isLongFormat == 0", 
                                  uiOutput("nRows"),
@@ -242,11 +238,14 @@ server <- function(input, output, session) {
     # 按下"transform"按钮后，将原始数据转换为长数据格式
     output$nRows <- renderUI({
         if (is.null(input$file)) return()
-        selectInput("nRows", "多少行是tag/ID", choices = 1:nrow(datRaw()), selected = 2)
+      selectInput("nRows",
+                  "How many rows for TAG/ID",
+                  choices = 1:nrow(datRaw()),
+                  selected = 2)
     })
     output$preFix <- renderUI({
         if (is.null(input$file)) return()
-        textInput("preFix", "tag/ID前缀（比如A;B;C）", value = "T;R")
+        textInput("preFix", "Set TAG/ID Prefix（for example, A;B;C）", value = "T;R")
     })
     output$TagNames <- renderUI({
         if (is.null(input$file)) return()
