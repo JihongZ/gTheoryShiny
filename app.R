@@ -14,7 +14,7 @@
 #
 
 # 【X】 1) data input应该也允许用户们上传long format的，只有当数据是wide format我们才提供transform的service
-# 【X】 2）boostrap得允许人家设置bootstrap多少次
+# 【X】 2）bootstrap得允许人家设置bootstrap多少次
 # 【X】 3）extract出random effect可供下载
 # 【X】 4）留一个说明页的tab界面用来放instruction或tutorials
 # 【x】 5）测试一下其他不同design数据形式下，比如crossed和4个多重nested level，弄几个内置sample dataset可以供人直接下载mock on
@@ -174,7 +174,8 @@ ui <- navbarPage(
            # Sidebar with a slider input for number of bins
            sidebarLayout(
              sidebarPanel(
-               p("Control facets/outcome："),
+               h4("Control Panel："),
+            
                # show selection area for ID
                uiOutput("selectedID"),
                # show selection area for facets
@@ -183,6 +184,17 @@ ui <- navbarPage(
                uiOutput("selectedCovariates"),
                # show selection area for outcome
                uiOutput("selectedOutcome"),
+               # whether mGtheory is used
+               hr(),
+               h5("Multivariate G-theory Setup:"),
+               tags$b(tags$span(style="color:darkgrey; font-size:18px",
+                                "ignore if you use univariate G-theory")),
+               checkboxInput("mGtheory", label = "mGtheory?", FALSE),
+               ## 设定tag/ID前缀和标签
+               conditionalPanel(
+                 condition = "input.mGtheory == 1",
+                 uiOutput("selectedFixedFacet"),
+               ),
                actionButton("variableSettingConfirm", "confirm")
              ),
              # Show a plot of the generated distribution
@@ -436,12 +448,15 @@ server <- function(input, output, session) {
   selectedOutcome = reactive({
     input$selectedOutcome
   })
+  selectedFixedFacet = reactive({
+    input$selectedFixedFacet
+  })
   
   # 选择ID
   output$selectedID <- renderUI({
     selectInput(
       "selectedID",
-      "Which column represents ID:",
+      "1. Which column represents ID:",
       choices = colnames(dat),
       selected = colnames(dat)[1]
     )
@@ -451,7 +466,7 @@ server <- function(input, output, session) {
   output$selectedMultipleFacets <- renderUI({
     checkboxGroupInput(
       "selectedMultipleFacets",
-      "Which column(s) represent facets:",
+      "2. Which column(s) represent facet(s):",
       choices = colnames(dat),
       selected = colnames(dat)
     )
@@ -461,21 +476,33 @@ server <- function(input, output, session) {
   output$selectedCovariates <- renderUI({
     checkboxGroupInput(
       "selectedCovariates",
-      "Which column(s) represent covariates:",
+      "3. Which column(s) represent covariates:",
       choices = colnames(dat),
       selected = colnames(dat)
     )
   })
   
+ 
   # 选择outcome
   output$selectedOutcome <- renderUI({
     selectInput(
       "selectedOutcome",
-      "Which column represents outcome:",
+      "4. Which column represents outcome:",
       choices = colnames(dat),
       selected = ifelse("Score" %in% colnames(dat), "Score", colnames(dat)[ncol(dat)])
     )
   })
+  
+  # 选择fixed facet
+  output$selectedFixedFacet <- renderUI({
+    checkboxGroupInput(
+      "selectedFixedFacet",
+      "5. Which column(s) represent fixed facet(s) for multivariate G-theory:",
+      choices = selectedFacet(),
+      selected = selectedFacet()
+    )
+  })
+  
   
   ## Generate table illustrating nested design: crossed or nested
   nestedStrc <- reactive({
