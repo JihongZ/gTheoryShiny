@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.1.189">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Jihong Zhang">
+
+<title>gTheoryShiny: An online application for interactive G-theory inference</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1.6em;
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="manual_files/libs/clipboard/clipboard.min.js"></script>
+<script src="manual_files/libs/quarto-html/quarto.js"></script>
+<script src="manual_files/libs/quarto-html/popper.min.js"></script>
+<script src="manual_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="manual_files/libs/quarto-html/anchor.min.js"></script>
+<link href="manual_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="manual_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="manual_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="manual_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="manual_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">gTheoryShiny: An online application for interactive G-theory inference</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Jihong Zhang </p>
+          </div>
+  </div>
+    
+    
+  </div>
+  
+
+</header>
+
+<section id="introduction" class="level2">
+<h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
+<p><em><code>gTheoryShiny</code></em> is an <em><code>R/Shiny</code></em> application for interactive construction, and inference of generalizability theory (also named G-theory) for performance assessment, which provide friendly GUI for users lacking of programming skills. It’s heavely based on <strong>lme4 (need refs)</strong> for multilevel modeling. To illustrate the functionality of this app, this manual is organized as following:</p>
+<ul>
+<li><p>Input section</p>
+<ol type="1">
+<li>Individual Data (.csv)</li>
+</ol></li>
+<li><p>Facet screening</p></li>
+<li><p>g-theory inference</p>
+<ol type="1">
+<li><p>g-study estimation</p></li>
+<li><p>d-study estimation</p></li>
+</ol></li>
+<li><p>Measurement error</p>
+<ol type="1">
+<li><p>g-study bootstrapping error</p></li>
+<li><p>d-study bootstrapping error</p></li>
+</ol></li>
+</ul>
+</section>
+<section id="input-section" class="level2">
+<h2 class="anchored" data-anchor-id="input-section">Input section</h2>
+<section id="individual-data-.csv" class="level3">
+<h3 class="anchored" data-anchor-id="individual-data-.csv">1. Individual Data (.csv)</h3>
+<p>Currently, the app also support .csv file. The data supported by gTheoryShiny can be either long-format or wide-format.</p>
+<section id="wide-format-data" class="level4">
+<h4 class="anchored" data-anchor-id="wide-format-data">Wide-format data</h4>
+<p>If your data is wide-format, the app can help you transform the wide-format data into the long-format data. First, please make sure the first several rows of data include identifier of all facets (in the example table below, facets are <em>task1/task2</em> and <em>rater1/rater2</em>). Header is optional. If the data contains the header, check the box of “<em>include header”.</em> The first column of the data should be subject ID (<em>Person</em> in the table). Then, each row should represent each subject’s all observations.</p>
+<p>In addition, there are three settings you should fill in: (1) how many rows represent tag/ID, (2) the pre-fix of tag/ID, (3) column names of tag/ID in the transformed long-format data. For example, to transform table 1 to table 2, setting 1 is <em>2</em> (first two rows contains all facets’ identifier), setting 2 can be <em>T;R</em> (the identifiers of facets have pre-fix T and R with the same order with the order of each facet’s rows)<em>,</em> and setting 3 can be <em>Task;Rater</em> (in long-format, the column names of facets are Task and Rater in order).</p>
+<p>It should also be noted that the long-format data transformed in this way automate generate two columns in the first column and the last column respectively: <em>ID</em> and <em>Score</em>. ID’s values correspond to subject ID, and Score’s values are same as values in the corresponding cells in wide-format data. Currently, there’s no way to change the column names of these two variables.</p>
+<p>Finally, don’t forget to click <em>Transform</em> button to finish the wide-to-long transformation.</p>
+<table class="table">
+<caption>Table 1: An Example of Wide-format Data</caption>
+<thead>
+<tr class="header">
+<th>Person</th>
+<th>Task1.Rater1</th>
+<th>Task1.Rater2</th>
+<th>Task2.Rater1</th>
+<th>Col5</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td></td>
+<td>Task1</td>
+<td>Task1</td>
+<td>Task2</td>
+<td>Task2</td>
+</tr>
+<tr class="even">
+<td></td>
+<td>Rater1</td>
+<td>Rater2</td>
+<td>Rater1</td>
+<td>Rater2</td>
+</tr>
+<tr class="odd">
+<td>1</td>
+<td>5</td>
+<td>6</td>
+<td>7</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+<table class="table">
+<caption>Table 2: An Example of Long-format Data</caption>
+<thead>
+<tr class="header">
+<th>ID</th>
+<th>Task</th>
+<th>Rater</th>
+<th>Score</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>T_Task1</td>
+<td>R_Rater1</td>
+<td>5</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>T_Task1</td>
+<td>R_Rater2</td>
+<td>6</td>
+</tr>
+<tr class="odd">
+<td>1</td>
+<td>T_Task2</td>
+<td>R_Rater1</td>
+<td>7</td>
+</tr>
+<tr class="even">
+<td>1</td>
+<td>T_Task2</td>
+<td>R_Rater2</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="long-format-data" class="level4">
+<h4 class="anchored" data-anchor-id="long-format-data">Long-format Data</h4>
+<p>If the data is already long-format before uploading, there are no extra step to set up. Only things needed to be checked are (1) check “<em>long-format”</em> checkbox under the Data property, (2) check or uncheck”<em>include header”</em> giving whether the data has headers or not.</p>
+</section>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    setTimeout(function() {
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const cites = ref.parentNode.getAttribute('data-cites').split(' ');
+    tippyHover(ref, function() {
+      var popup = window.document.createElement('div');
+      cites.forEach(function(cite) {
+        var citeDiv = window.document.createElement('div');
+        citeDiv.classList.add('hanging-indent');
+        citeDiv.classList.add('csl-entry');
+        var biblioDiv = window.document.getElementById('ref-' + cite);
+        if (biblioDiv) {
+          citeDiv.innerHTML = biblioDiv.innerHTML;
+        }
+        popup.appendChild(citeDiv);
+      });
+      return popup.innerHTML;
+    });
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

@@ -22,8 +22,18 @@
 
 
 rm(list = ls())
+missingMethods = c(
+  "na.omit (default)",
+  "Zero Inputation",
+  "Mean Inputation",
+  "Median Inputation"
+)
 source("library_load.R")
 source("advGtheoryFunctions.R")
+
+## Source all modules
+source("modules/inputFile_module.R") # Input CSV file
+source("modules/LongToWide_module.R") # Input CSV file
 nboot = 200
 
 # Define UI for application that draws a histogram
@@ -132,34 +142,26 @@ ui <- navbarPage(
   tabPanel("Data Input",
            sidebarLayout(
              sidebarPanel(
-               # Copy the line below to make a file upload manager
-               fileInput(
-                 "file",
-                 label = h4("Choose CSV File:"),
-                 accept = ".csv",
-                 buttonLabel = "Upload..."
-               ),
+               csvFileUI("fileUpload", h4("Choose CSV File:")),
                p(
                  "Notice: If data is wide-format, make sure the first two rows of your data file should be TAG/ID, first column should be subject ID"
                ),
                verbatimTextOutput("newNotificaion"),
                
-               h4("Data property:"),
-               checkboxInput("isLongFormat", "long-format", TRUE),
-               # ask if the data is long-format or wide-format
-               checkboxInput("isHeaderIncluded", "include header", TRUE),
-               
-               hr(),
-               h4("Long to Wide Transformation:"),
-               ## 设定tag/ID前缀和标签
-               conditionalPanel(
-                 condition = "input.isLongFormat == 0",
-                 uiOutput("nRows"),
-                 uiOutput("preFix"),
-                 uiOutput("TagNames"),
-                 ## 转换
-                 actionButton("transform", "Transform")
-               ),
+               # pivotwiderUI("LongToWide")
+               tagList(
+                 h4("Long to Wide Transformation:"),
+                 ## 设定tag/ID前缀和标签
+                 checkboxInput("isLongFormat", "Long Format?", TRUE),
+                 conditionalPanel(
+                   condition = "input.isLongFormat == 0",
+                   uiOutput("nRowsSelection"),
+                   uiOutput("preFixText"),
+                   uiOutput("TagNamesText"),
+                   ## 转换
+                   actionButton("transform", "Transform")
+                 )
+               )
              ),
              mainPanel(
                h2("Raw Data:"),
@@ -175,27 +177,35 @@ ui <- navbarPage(
            sidebarLayout(
              sidebarPanel(
                h4("Control Panel："),
-            
                # show selection area for ID
                uiOutput("selectedID"),
-               # show selection area for facets
-               uiOutput("selectedMultipleFacets"),
-               # show selection area for covariates
-               uiOutput("selectedCovariates"),
                # show selection area for outcome
                uiOutput("selectedOutcome"),
+               # show selection area for facets
+               uiOutput("selectedMultipleFacets"),
+               # Missing data
+               selectInput(
+                 "missingMethod",
+                 label = "4. Missing Method:",
+                 choices = missingMethods,
+                 selected = missingMethods[1]
+               ),
+               # show selection area for covariates
+               hr(),
+               uiOutput("selectedCovariates"),
                # whether mGtheory is used
                hr(),
-               h5("Multivariate G-theory Setup:"),
-               tags$b(tags$span(style="color:darkgrey; font-size:18px",
-                                "ignore if you use univariate G-theory")),
+               h5("(Optional) Multivariate G-theory Setup:"),
+               # tags$b(tags$span(style="color:darkgrey; font-size:18px",
+               #                  "ignore if you use univariate G-theory")),
                checkboxInput("mGtheory", label = "mGtheory?", FALSE),
                ## 设定tag/ID前缀和标签
                conditionalPanel(
                  condition = "input.mGtheory == 1",
                  uiOutput("selectedFixedFacet"),
+                 uiOutput("selectedSubtest")
                ),
-               actionButton("variableSettingConfirm", "confirm")
+               actionButton("variableSettingConfirm", "Confirm")
              ),
              # Show a plot of the generated distribution
              mainPanel(
@@ -218,29 +228,31 @@ ui <- navbarPage(
   tabPanel("Data Analysis",
            sidebarLayout(
              sidebarPanel(
-               # strong("Recommended formula："),
-               # textOutput("recommFormular"),
-               textInput("selfFormular", "User-specified formula: ",
+               h3("Formula Setting: "),
+               textInput("selfFormular", "1. User-specified formula: ",
                          placeholder = "Default: recommeded formula"),
                selectInput(
                  "linkFunc",
-                 label = "Link Function:",
+                 label = "2. Link Function:",
                  choices = c("identity", "logit", "probit", "poisson", "inverse gamma"),
                  selected = "identity"
                ),
                sliderInput(
                  inputId = "nboot",
-                 label = "Number of bootstrap",
+                 label = "3. Number of bootstrap for G-study and D-study",
                  min = 100,
                  max = 1000,
                  value = 200
                ),
-               
                hr(),
                ## 运行gstudy
                h3("G-study："),
                actionButton("runRecommModel", "gstudy estimate"),
                actionButton("runRecommModelBoot", "bootstrap estimate"),
+               conditionalPanel(
+                 condition = "input.mGtheory == 1",
+                 actionButton("runmGtheoryModel", "multivariate G-theory estimate")
+               ),
                progressBar(
                  id = "gstudybar",
                  value = 0,
@@ -277,7 +289,6 @@ ui <- navbarPage(
                  actionButton(inputId = "confirmFacetLevel",
                               label = "confirm facet levels")
                ),
-               h4("D-study Estimate:"),
                actionButton("runRecommModelDstudy", "dstudy estimate"),
                actionButton("runRecommModelDstudyBoot", "bootstrap estimate"),
                progressBar(id = "dstudybar",
@@ -336,38 +347,13 @@ ui <- navbarPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  observe({
-    # 隐藏转换按钮
-    shinyjs::hide("transform")
-    if (!is.null(input$file))
-      shinyjs::show("transform")
-  })
-  
   # 上传数据
-  datRaw <- reactive({
-    file <- input$file
-    if (is.null(file)) {
-      return()
-    }
-    ext <- tools::file_ext(file$datapath)
-    
-    req(file)
-    validate(need(ext == "csv", "Please upload a csv file"))
-    read.csv(file$datapath, header = input$isHeaderIncluded)
-  })
+  datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
-  # 显示数据
-  output$rawDataTable <- renderDT({
-    if (is.null(input$file)) {
-      return()
-    }
-    datRaw()
-  })
-  
+  # 把数据转化为长数据
+  # pivotwiderServer("LongToWide", data = datRaw())
   # 按下"transform"按钮后，将原始数据转换为长数据格式
-  output$nRows <- renderUI({
-    if (is.null(input$file))
-      return()
+  output$nRowsSelection <- renderUI({
     selectInput(
       "nRows",
       "How many rows for TAG/ID",
@@ -375,65 +361,64 @@ server <- function(input, output, session) {
       selected = 2
     )
   })
-  output$preFix <- renderUI({
-    if (is.null(input$file))
-      return()
-    textInput("preFix", "Set TAG/ID Prefix（for example, A;B;C）", value = "T;R")
+  
+  output$preFixText <- renderUI({
+    textInput("TagPreFix", 
+              "Set tag/ID TagPreFix（for example, A;B;C）", 
+              value = "T;R")
   })
-  output$TagNames <- renderUI({
-    if (is.null(input$file))
-      return()
+  
+  output$TagNamesText <- renderUI({
     textInput("TagNames",
               "tag/ID的column名字(比如Class;Rater;Item)",
               "Task;Rater")
   })
   
-  # Reactive values: interactively receive the tag/ID information---------------------
-  observeEvent(input$file, {
-    dat <<- datRaw()
+  
+  # 显示数据
+  output$rawDataTable <- renderDT({
+    datRaw()
   })
+  
+  # Reactive values: interactively receive the tag/ID information---------------------
+  
   NText = reactive({
     input$nRows
   }) # 有多少行是tag/ID
   preFixText = reactive({
-    input$preFix
+    input$TagPreFix
   }) # 前缀，比如A_, R_, C_
   TagNamesText = reactive({
     input$TagNames
   }) # 侧面的标签比如："Class", "Rater", "Item"
+  
+  observeEvent(datRaw(), {dat <<- datRaw()})
+    
+
   observeEvent(input$transform, {
-    file <- datRaw()
     N = as.numeric(NText())
-    preFix <- str_split(preFixText(), ";")[[1]]
+    TagPreFix <- str_split(preFixText(), ";")[[1]]
     TagNames <- str_split(TagNamesText(), ";")[[1]]
     #第N行是facets
-    tags = file[1:N,]
+    tags = datRaw()[1:N,]
     # 将所有facets合并成特殊ID
     tagWLabels = apply(tags, 2, function(x)
-      paste0(preFix, "_", x))
+      paste0(TagPreFix, "_", x))
     mergedID = as.character(apply(tagWLabels, 2, function(x)
       paste0(x, collapse = ";"))[-1])
-    datTrans <- dplyr::tibble(file[-(1:N), ])
+    datTrans <- dplyr::tibble(datRaw()[-(1:N), ])
     colnames(datTrans) <- c("ID", mergedID)
     dat <<- datTrans |>
-      pivot_longer(cols = {
-        {
-          mergedID
-        }
-      }, values_to = "Score") |>
+      pivot_longer(cols = {{mergedID}}, values_to = "Score") |>
       separate(name, into = TagNames, sep = ";")
+    
     # output file
     output$transDataTable <- renderDT({
       dat
     })
   })
   
-  
-  
-  
-  
-  # Sever for tag page 2 ----------------------------------------------------
-  
+  # Server for tag page 2 ----------------------------------------------------
   ## Reaction values: Facet / Covariates / Outcome ----
   
   unit = reactive({
@@ -451,12 +436,25 @@ server <- function(input, output, session) {
   selectedFixedFacet = reactive({
     input$selectedFixedFacet
   })
+  selectedSubtest = reactive({
+    input$selectedSubtest
+  })
   
   # 选择ID
   output$selectedID <- renderUI({
     selectInput(
       "selectedID",
-      "1. Which column represents ID:",
+      "1. Which variable represents ID:",
+      choices = colnames(dat),
+      selected = colnames(dat)[1]
+    )
+  })
+  
+  # 选择outcome
+  output$selectedOutcome <- renderUI({
+    selectInput(
+      "selectedOutcome",
+      "2. Which variable represents outcome:",
       choices = colnames(dat),
       selected = colnames(dat)[1]
     )
@@ -466,9 +464,9 @@ server <- function(input, output, session) {
   output$selectedMultipleFacets <- renderUI({
     checkboxGroupInput(
       "selectedMultipleFacets",
-      "2. Which column(s) represent facet(s):",
+      "3. Which column(s) represent facet(s):",
       choices = colnames(dat),
-      selected = colnames(dat)
+      selected = NULL
     )
   })
   
@@ -476,28 +474,41 @@ server <- function(input, output, session) {
   output$selectedCovariates <- renderUI({
     checkboxGroupInput(
       "selectedCovariates",
-      "3. Which column(s) represent covariates:",
+      "(Optional) Which column(s) represent covariates:",
       choices = colnames(dat),
-      selected = colnames(dat)
+      selected = NULL
     )
   })
   
- 
-  # 选择outcome
-  output$selectedOutcome <- renderUI({
-    selectInput(
-      "selectedOutcome",
-      "4. Which column represents outcome:",
-      choices = colnames(dat),
-      selected = ifelse("Score" %in% colnames(dat), "Score", colnames(dat)[ncol(dat)])
-    )
+  ## missing data server
+  observeEvent(input$variableSettingConfirm, {
+    method = selectedMissingMethod()
+    ## Deal with missing method
+    if(method == "Zero Inputation"){
+      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), 0)
+    }else if(method == "Mean Inputation"){
+      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), mean(dat[[selectedOutcome()]], na.rm = TRUE))
+    }else if(method == "Median Inputation"){
+      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), median(dat[[selectedOutcome()]], na.rm = TRUE))
+    }else{
+      dat <<- dat[!is.na(dat[[selectedOutcome()]]),]
+    }
   })
   
-  # 选择fixed facet
+  # mgTheory选择fixed facet
   output$selectedFixedFacet <- renderUI({
     checkboxGroupInput(
       "selectedFixedFacet",
-      "5. Which column(s) represent fixed facet(s) for multivariate G-theory:",
+      "5. Which column represent fixed facet:",
+      choices = selectedFacet(),
+      selected = selectedFacet()
+    )
+  })
+  
+  output$selectedSubtest <- renderUI({
+    checkboxGroupInput(
+      "selectedSubtest",
+      "6. Which column represent subtest:",
       choices = selectedFacet(),
       selected = selectedFacet()
     )
@@ -577,6 +588,62 @@ server <- function(input, output, session) {
            formularText)
   })
   
+  ## mGtheory formula
+  mgtheoryFormula <- reactive({
+    nestedStrcTable <- nestedStrc() # load nested structure
+    formularFacets <- NULL
+    
+    for (r in 1:nrow(nestedStrcTable)) {
+      if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
+        formularFacets <-
+          c(formularFacets,
+            paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
+      }
+      if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
+        tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
+        nested <-
+          !any(apply(tab, 1, function(x)
+            sum(x != 0) > 1))
+        if (nested) {
+          formularFacets <-
+            c(
+              formularFacets,
+              paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
+              paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
+              paste0(
+                "(1 | ",
+                paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),
+                ")"
+              )
+            )
+        } else{
+          formularFacets <-
+            c(
+              formularFacets,
+              paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
+              paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
+              paste0(
+                "(1 | ",
+                paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]),
+                ")"
+              )
+            )
+        }
+      }
+    }
+    ## add covariates and facets into the formulate
+    
+    paste0("us(", selectedFixedFacet(), " | ", selectedSubtest(), ")")
+    formularText <-
+      paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
+    
+    paste0(selectedOutcome(),
+           " ~ (1 |",
+           input$selectedID,
+           ") + ",
+           formularText)
+  })
+  
   # Tabset2: 显示表格
   observeEvent(input$variableSettingConfirm, {
     # 表格打印： facet嵌套
@@ -594,6 +661,10 @@ server <- function(input, output, session) {
   })
   
   # Running recommended model ------------------------------------------------------------------
+  selectedMissingMethod = reactive({
+    input$missingMethod
+  })
+  
   output$recommFormular <- renderText({
     makeeasyformular(gtheoryFormula())
   })
@@ -601,8 +672,9 @@ server <- function(input, output, session) {
   gstudyResult <- eventReactive(input$runRecommModel, {
     nFacet <- NULL
     datG <- dat
-    datG[[selectedOutcome()]] <-
-      as.numeric(dat[[selectedOutcome()]])
+    
+    datG[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
+    
     datG[c(input$selectedID, selectedFacet())] <-
       lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
     if (input$selfFormular == "") {
@@ -624,7 +696,6 @@ server <- function(input, output, session) {
   
   dstudyResult <- eventReactive(input$runRecommModelDstudy, {
     datD <- dat
-    
     datD[[selectedOutcome()]] <-
       as.numeric(datD[[selectedOutcome()]])
     datD[c(input$selectedID, selectedFacet())] <-

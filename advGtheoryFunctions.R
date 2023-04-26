@@ -15,21 +15,7 @@
 #' gstudy(two_facet, fixed = "prompts")
 #' @export
 
-# library(gtheory)
-# data(Brennan.3.2)
-# Data=Brennan.3.2
-# n= c("Rater" = 2, "Task" = 5)
-# unit="Person"
-# outcome='Score'
-# nboot=3
-# 
-# #variable  
-# n = c("Rater" = 2, "Task" = 5)
-# lme4.res<-lmer(Score ~ (1 | Person) + (1 | Task) +(1 | Rater:Task) + (1 | Person:Task),data = Data)
-# #res
-# randomEffectEstimate <- ranef(lme4.res) # Task 1: 做成csv用来output
-# randomEffectLevel <- lapply(lapply(Data, unique), length)
-# n = unlist(randomEffectLevel[!names(randomEffectLevel) %in% c(unit, outcome)]) # Task 2: 1 default 2 user setting
+
 
 #function
 gstudy <- function(x, fixed = NULL) {
@@ -73,6 +59,7 @@ cbind_dif <- function(x = list()){
   
   return(as.data.frame(res))
 }
+
 extractTheta <- function(x) {
   est <- coef(x)
   est <- sapply(est, function(x) unlist(x))
