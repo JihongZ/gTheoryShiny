@@ -18,7 +18,7 @@
 # 【X】 3）extract出random effect可供下载
 # 【X】 4）留一个说明页的tab界面用来放instruction或tutorials
 # 【x】 5）测试一下其他不同design数据形式下，比如crossed和4个多重nested level，弄几个内置sample dataset可以供人直接下载mock on
-# 【X】 6）加入covariate的功能
+# 【X】 6）加入co-variate的功能
 
 
 rm(list = ls())
@@ -33,12 +33,12 @@ source("advGtheoryFunctions.R")
 
 ## Source all modules
 source("modules/inputFile_module.R") # Input CSV file
-source("modules/LongToWide_module.R") # Input CSV file
+source("modules/LongToWide_module.R") # Long format to Wide format
 nboot = 200
 
 # Define UI for application that draws a histogram
 ui <- navbarPage(
-  "G-theory Data Explorer",
+  "gtheory Shiny App",
   
   # title
   useShinyjs(),
@@ -245,8 +245,9 @@ ui <- navbarPage(
                  value = 200
                ),
                hr(),
+               ## Page: Run gstudy ----------------------------------------
                ## 运行gstudy
-               h3("G-study："),
+               h3("Gstudy："),
                actionButton("runRecommModel", "gstudy estimate"),
                actionButton("runRecommModelBoot", "bootstrap estimate"),
                conditionalPanel(
@@ -278,7 +279,7 @@ ui <- navbarPage(
                
                hr(),
                ## 运行dstudy
-               h3("D-study："),
+               h4("Dstudy："),
                ### 选择要修改的facet
                uiOutput("selectedFacetMenu"),
                #选择一个facet
@@ -306,11 +307,11 @@ ui <- navbarPage(
                                 "Download bootstrap result")
                ),
              ),
-             # output panel: gstudy / dstudy ----
+             # Output panel: gstudy / dstudy ----
              mainPanel(
                conditionalPanel(
                  condition = "input.runRecommModel >= 1",
-                 h4("G-study Output："),
+                 h4("Gstudy Output："),
                  h5("Fixed Effects Output："),
                  verbatimTextOutput("recommModelFixedEffectResult"),
                  h5("Random Effects Output："),
@@ -324,7 +325,7 @@ ui <- navbarPage(
                ),
                conditionalPanel(
                  condition = "input.runRecommModelDstudy >= 1",
-                 h4("D-study Output："),
+                 h4("Dstudy Output："),
                  p("Sample Size:"),
                  verbatimTextOutput("updatedN"),
                  p("Result:"),
@@ -356,15 +357,15 @@ server <- function(input, output, session) {
   output$nRowsSelection <- renderUI({
     selectInput(
       "nRows",
-      "How many rows for TAG/ID",
-      choices = 1:nrow(datRaw()),
-      selected = 2
+      "How many rows represent tages of facets?",
+      choices = 0:nrow(datRaw()),
+      selected = 1
     )
   })
   
   output$preFixText <- renderUI({
     textInput("TagPreFix", 
-              "Set tag/ID TagPreFix（for example, A;B;C）", 
+              "Set up tag's prefix（for example, A;B;C）", 
               value = "T;R")
   })
   
@@ -380,7 +381,7 @@ server <- function(input, output, session) {
     datRaw()
   })
   
-  # Reactive values: interactively receive the tag/ID information---------------------
+  # tag/ID information---------------------
   
   NText = reactive({
     input$nRows
@@ -534,7 +535,7 @@ server <- function(input, output, session) {
   })
   
   
-  ## 将用户输入的公式转换成gtheory认可的公式 ----
+  ## gtheory and dtheory Formula Generator ----
   gtheoryFormula <- reactive({
     nestedStrcTable <- nestedStrc() # load nested structure
     formularFacets <- NULL
@@ -580,13 +581,9 @@ server <- function(input, output, session) {
     ## add covariates and facets into the formulate
     formularText <-
       paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
+    paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", formularText) 
     
-    paste0(selectedOutcome(),
-           " ~ (1 |",
-           input$selectedID,
-           ") + ",
-           formularText)
-  })
+})
   
   ## mGtheory formula
   mgtheoryFormula <- reactive({
