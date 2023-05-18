@@ -309,3 +309,46 @@ makehardformular <- function(formular) {
   formular <- str_replace_all(formular, pattern = "\\+", replacement = ")+(1|")
   paste0(formular, ")")
 }
+
+
+# multivariate G-theory functions -----------------------------------------
+extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
+                                     order = c("cov.last", "lower.tri"), residCor) 
+{
+  order <- match.arg(order)
+  tmpf <- function(v, grp) {
+    lt.v <- lower.tri(v, diag = FALSE)
+    # vcov <- c(diag(v), v[lt.v <- lower.tri(v, diag = FALSE)])
+    sdcor <- c(attr(v, "stddev"), attr(v, "correlation")[lt.v])
+    nm <- rownames(v)
+    n <- nrow(v)
+    dd <- data.frame(grp = grp, 
+                     var1 = nm[c(seq(n), col(v)[lt.v])], 
+                     var2 = c(rep(NA, n), nm[row(v)[lt.v]]), 
+                     sdcor, 
+                     stringsAsFactors = FALSE)
+    if (order == "lower.tri") {
+      m <- matrix(NA, n, n)
+      diag(m) <- seq(n)
+      m[lower.tri(m)] <- (n + 1):(n * (n + 1)/2)
+      dd <- dd[m[lower.tri(m, diag = TRUE)], ]
+    }
+    dd
+  }
+  r <- do.call(rbind, c(mapply(tmpf, x, names(x), SIMPLIFY = FALSE), 
+                        deparse.level = 0))
+  if (attr(x, "useSc")) {
+    ss <- attr(x, "sc")
+    r <- rbind(r, data.frame(grp = "Residual", var1 = NA, 
+                             var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
+  }
+  rownames(r) <- NULL
+  r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+  
+  ## adjust table
+  resTable <- r |> 
+    mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
+    pivot_wider(names_from = var2, values_from = sdcor)
+  resTable
+}
+
