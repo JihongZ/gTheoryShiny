@@ -20,7 +20,7 @@ dat <- tribble(
   9,1,1,1,1,1,1,1,1,1,1,1,0,
   10,1,1,1,1,1,1,1,1,1,1,1,1
 )
-write.csv(dat, file = "SyntheticDataSetNo1.csv", row.names = FALSE)
+write.csv(dat, file = "data/SyntheticDataSetNo1.csv", row.names = FALSE)
 n_i = 12
 n_p = 10
 ## Grant mean Bar_X
@@ -54,14 +54,13 @@ X = as.matrix(dat[-1])
 
 ## Comparison: linear mixed model (same as Brennan's formula) ----------------------------------------
 ##     grp       vcov
-## 1     Item 0.07542093
+## 1 Item 0.07542093
 ## 2 Person 0.05740748
 ## 3 Residual 0.12685183 ---> Brennan: Person X Item interaction
 dat_long <- dat |> 
   pivot_longer(starts_with("I"), names_to = "Item", values_to = "Score")
 VarCorMatrix <- VarCorr(lmer(Score ~ (1|Person) + (1|Item), dat_long))
 VarCorMatrix |> as.data.frame() |> select(grp, vcov)
-
 
 # Error Variance ----------------------------------------------------------
 ## d-study sample size
@@ -74,17 +73,25 @@ n_i_prime = n_i
 ## Relative error variance
 (SigmaSqr_delta = SigmaSqr_pI)
 
-
-
 # Reliability Coefficients ------------------------------------------------
 ### generalizability coefficient: Eq. 2.39 
 (rho <- SigmaSqr_p / (SigmaSqr_p + SigmaSqr_delta))
 ### d-study coefficient: Eq. 2.41 
 (Phi <- SigmaSqr_p / (SigmaSqr_p + SigmaSqr_Delta))
 
-
-
 # Visualization -----------------------------------------------------------
+###### --- 
+# Test gtheory function
+###### ---
+dat_long <- dat |> 
+  pivot_longer(starts_with("I"), names_to = "Item", values_to = "Score")
+lmeres = lmer(Score ~ (1|Person) + (1|Item), dat_long)
+gstudy(lmeres)
+
+## ----------------------------- ##
+##              End.             ##
+## ----------------------------- ##
+
 gtheoryCoef <- function(dat, n) {
   ## transform wide to long
   dat_long <- dat |> 

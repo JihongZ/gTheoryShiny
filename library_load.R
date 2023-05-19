@@ -3,6 +3,7 @@ library_load <-
     if(!require(pacman)){install.packages("pacman")}
     if(!require(glmmTMB)){install.packages("glmmTMB", type="source")}
     pacman::p_load(
+      "shinyalert",
       "MASS",
       "shiny",
       "shinyjs",

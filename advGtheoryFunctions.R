@@ -20,13 +20,13 @@
 #function
 gstudy <- function(x, fixed = NULL) {
   tmp <- as.data.frame(VarCorr(x))
-  tmp <- tmp[c(1,4)]
+  tmp <- tmp[c(1,4)] # select out variance components
   no.match <- function(x) {x[-match(fixed, x)]}
   if(!is.null(fixed)){
     n_adj <- length(unique(x@frame[,grep(fixed, names(x@frame))]))
     fixed_vars <- tmp[grep(fixed, tmp$grp),]
     fixed_vars <- fixed_vars[-match(fixed, fixed_vars$grp),]
-    fixed_vars$adj_vcov <- fixed_vars$vcov/n_adj;fixed_vars$vcov <- NULL
+    fixed_vars$adj_vcov <- fixed_vars$vcov/n_adj; fixed_vars$vcov <- NULL
     add_back <- strsplit(fixed_vars$grp, ":")
     fixed_vars$grp <- sapply(add_back, no.match)
     two.way <- data.frame(grp = paste(fixed_vars$grp, collapse = ":"), adj_vcov = tmp[nrow(tmp),2]/n_adj)

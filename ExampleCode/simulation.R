@@ -48,6 +48,9 @@ write.csv(dat, "FullyCrossedData.csv", row.names = FALSE)
 library(glmmTMB)
 library(lme4)
 
+res <- lmer(Score ~ (0 + Occasion | Person_ID) + (0 + Occasion | Item_ID) , data = dat)
+summary(res)
+gstudy(res, fixed = "Occasion")
 
 # first run ---------------------------------------------------------------
 m2_mGT <- as.formula("Score ~ us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) ")
