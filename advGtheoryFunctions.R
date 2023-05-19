@@ -297,16 +297,32 @@ print.dStudy <- function(x, ...){
 
 # print.dStudy(dstudy.res_boot)
 
+# formular1 <- "Score ~ (1 | Person_ID) +  (1 | Item_ID) "
+# formular2 <- "Score ~ us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) "
+# easyformular <- "Score = Occasion | Person_ID + Occasion | Item_ID "
+# makeeasyformular(formular1)
+# makeeasyformular(formular2)
+# 
+# makehardformular(makeeasyformular(formular1))
+# makehardformularMGtheory(makeeasyformular(formular2))
+# makeeasyformular(formular2)
 
 makeeasyformular <- function(formular) {
   formular <- str_replace_all(formular, pattern = "\\~", replacement = "=")
   formular <- str_replace_all(formular, pattern = "\\(1 \\|", replacement = "")
+  formular <- str_replace_all(formular, pattern = "us\\(", replacement = "")
+  formular <- str_replace_all(formular, pattern = "\\+ 0", replacement = "")
   str_replace_all(formular, pattern = "\\)", replacement = "")
 }
 
 makehardformular <- function(formular) {
   formular <- str_replace_all(formular, pattern = "\\=", replacement = "~(1|")
   formular <- str_replace_all(formular, pattern = "\\+", replacement = ")+(1|")
+  paste0(formular, ")")
+}
+makehardformularMGtheory <- function(formular) {
+  formular <- str_replace_all(formular, pattern = "\\+", replacement = ") + ( 0 +")
+  formular <- str_replace_all(formular, pattern = "\\=", replacement = "~ ( 0 +")
   paste0(formular, ")")
 }
 
@@ -352,3 +368,46 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
   resTable
 }
 
+
+### Extract var-cov from glmmTMB object ----------------------------------------
+
+
+extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
+                                     order = c("cov.last", "lower.tri"), residCor) 
+{
+  order <- match.arg(order)
+  tmpf <- function(v, grp) {
+    lt.v <- lower.tri(v, diag = FALSE)
+    # vcov <- c(diag(v), v[lt.v <- lower.tri(v, diag = FALSE)])
+    sdcor <- c(attr(v, "stddev"), attr(v, "correlation")[lt.v])
+    nm <- rownames(v)
+    n <- nrow(v)
+    dd <- data.frame(grp = grp, 
+                     var1 = nm[c(seq(n), col(v)[lt.v])], 
+                     var2 = c(rep(NA, n), nm[row(v)[lt.v]]), 
+                     sdcor, 
+                     stringsAsFactors = FALSE)
+    if (order == "lower.tri") {
+      m <- matrix(NA, n, n)
+      diag(m) <- seq(n)
+      m[lower.tri(m)] <- (n + 1):(n * (n + 1)/2)
+      dd <- dd[m[lower.tri(m, diag = TRUE)], ]
+    }
+    dd
+  }
+  r <- do.call(rbind, c(mapply(tmpf, x, names(x), SIMPLIFY = FALSE), 
+                        deparse.level = 0))
+  if (attr(x, "useSc")) {
+    ss <- attr(x, "sc")
+    r <- rbind(r, data.frame(grp = "Residual", var1 = NA, 
+                             var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
+  }
+  rownames(r) <- NULL
+  r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+  
+  ## adjust table
+  resTable <- r |> 
+    mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
+    pivot_wider(names_from = var2, values_from = sdcor)
+  resTable
+}

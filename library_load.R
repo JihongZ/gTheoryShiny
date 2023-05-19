@@ -9,7 +9,6 @@ library_load <-
       "shinyjs",
       "shinyWidgets", # for widgets like progress bar
       "lme4", # for lme modeling
-      "lme4qtl", # for co-variate model
       "glmmTMB", # for co-variate model
       "DT", # for data table
       "markdown", # for better markdown format

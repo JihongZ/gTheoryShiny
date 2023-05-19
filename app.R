@@ -1,24 +1,12 @@
 #
-# This is a Shiny web application for g theory visualization. ]
-#
-# Pathway:
-# 1, whether need bootstrapping sd
+# This is a Shiny web application for g theory visualization. 
 #
 # Data:
-#     1. sleepstudy:
-#         (1) Reaction: average reaction time
-#         (2) Days: number of days of sleep
-#         (3) Subject: Subject number
+#     1. SyntheticDataSetNo.1.csv: Single facet design (p X i)
+#     2. SyntheticDataSetNo.4.csv: two facet design (p X t X r)
+# Tutorial: (Mastering Shiny) https://mastering-shiny.org/
+# 【X】 1) 在dstudy界面可以選擇多個N，以便畫出曲線
 
-#    http://shiny.rstudio.com/
-#
-
-# 【X】 1) data input应该也允许用户们上传long format的，只有当数据是wide format我们才提供transform的service
-# 【X】 2）bootstrap得允许人家设置bootstrap多少次
-# 【X】 3）extract出random effect可供下载
-# 【X】 4）留一个说明页的tab界面用来放instruction或tutorials
-# 【x】 5）测试一下其他不同design数据形式下，比如crossed和4个多重nested level，弄几个内置sample dataset可以供人直接下载mock on
-# 【X】 6）加入co-variate的功能
 
 
 rm(list = ls())
@@ -36,14 +24,15 @@ source("modules/inputFile_module.R") # Input CSV file
 source("modules/LongToWide_module.R") # Long format to Wide format
 nboot = 200
 
-# Define UI for application that draws a histogram
+
+# UI ----------------------------------------------------------------------
 ui <- navbarPage(
   "gtheory Shiny App",
   
   # title
   useShinyjs(),
   
-  # Tab Page 0: Tutorial ----------------------------------------
+  ## Tab Page 0: Tutorial ----------------------------------------
   tabPanel(
     "Tutorial",
     # Sidebar with a slider input for number of bins
@@ -138,7 +127,7 @@ ui <- navbarPage(
     )
   ),
   
-  # Tag Page 1: A Tab to transform data from wide to long -------------------
+  ## Tag Page 1: Transform data from wide to long -------------------
   tabPanel("Data Input",
            sidebarLayout(
              sidebarPanel(
@@ -171,7 +160,7 @@ ui <- navbarPage(
            )),
   
   
-  # Tab Page 2: Check Data Structure ----------------------------------------
+  ## Tab Page 2: Check Data Structure ----------------------------------------
   tabPanel("Data Structure",
            # Sidebar with a slider input for number of bins
            sidebarLayout(
@@ -202,8 +191,7 @@ ui <- navbarPage(
                ## 设定tag/ID前缀和标签
                conditionalPanel(
                  condition = "input.mGtheory == 1",
-                 uiOutput("selectedFixedFacet"),
-                 uiOutput("selectedSubtest")
+                 uiOutput("selectedFixedFacet")
                ),
                actionButton("variableSettingConfirm", "Confirm")
              ),
@@ -224,7 +212,7 @@ ui <- navbarPage(
              )
            ),),
   
-  # Tab Page 3: Check Data Analysis ----------------------------------------
+  ## Tab Page 3: Check Data Analysis ----------------------------------------
   tabPanel("Data Analysis",
            sidebarLayout(
              sidebarPanel(
@@ -245,15 +233,11 @@ ui <- navbarPage(
                  value = 200
                ),
                hr(),
-               ## Page: Run gstudy ----------------------------------------
+               ### UI for gstudy / dstudy estimation ----------------------------------------
                ## 运行gstudy
                h3("Gstudy："),
-               actionButton("runRecommModel", "gstudy estimate"),
-               actionButton("runRecommModelBoot", "bootstrap estimate"),
-               conditionalPanel(
-                 condition = "input.mGtheory == 1",
-                 actionButton("runmGtheoryModel", "multivariate G-theory estimate")
-               ),
+               actionButton("runGstudyButton", "Run"),
+               actionButton("runGstudyBootButton", "Run bootstrapping"),
                progressBar(
                  id = "gstudybar",
                  value = 0,
@@ -264,67 +248,68 @@ ui <- navbarPage(
                ),
                ### 下载按钮
                conditionalPanel(
-                 condition = "input.runRecommModel >=1",
-                 downloadButton("downloadGstudyTheta", "Download theta estimates")
+                 condition = "input.runGstudyButton >=1",
+                 downloadButton("downloadGstudyTheta", "Factor Score Table")
                ),
                conditionalPanel(
-                 condition = "input.runRecommModel >=1",
-                 downloadButton("downloadGstudyResult", "Download gstudy result")
+                 condition = "input.runGstudyButton >=1",
+                 downloadButton("downloadGstudyResult", "Variance-Covariance Matrix")
                ),
                conditionalPanel(
-                 condition = "input.runRecommModelBoot >=1",
-                 downloadButton("downloadGstudyBootResult", "Download bootstrap result")
+                 condition = "input.runGstudyBootButton >=1",
+                 downloadButton("downloadGstudyBootResult", "Bootstrapping Result")
                ),
                
                
                hr(),
                ## 运行dstudy
-               h4("Dstudy："),
-               ### 选择要修改的facet
-               uiOutput("selectedFacetMenu"),
-               #选择一个facet
-               uiOutput("selectedFacetLevels"),
-               #选择factor levels
-               conditionalPanel(
-                 condition = "input.runRecommModel >= 1",
-                 actionButton(inputId = "confirmFacetLevel",
-                              label = "confirm facet levels")
-               ),
-               actionButton("runRecommModelDstudy", "dstudy estimate"),
-               actionButton("runRecommModelDstudyBoot", "bootstrap estimate"),
-               progressBar(id = "dstudybar",
-                           value = 0,
-                           total = 100),
-               ### 下载按钮dstudy
-               conditionalPanel(
-                 condition = "input.runRecommModelDstudy >=1",
-                 downloadButton("downloadDstudyResult",
-                                "Download dstudy result")
-               ),
-               conditionalPanel(
-                 condition = "input.runRecommModelDstudyBoot >=1",
-                 downloadButton("downloadDstudyBootResult",
-                                "Download bootstrap result")
+               checkboxInput("runDstudy", label = "run Dstudy", FALSE),
+               conditionalPanel(condition = "input.runDstudy == 1",
+                 h4("Dstudy："),
+                 ### 选择要修改的facet
+                 uiOutput("selectedFacetMenu"),
+                 #选择一个facet
+                 uiOutput("selectedFacetLevels"),
+                 #选择factor levels
+                 conditionalPanel(
+                   condition = "input.runGstudyButton >= 1",
+                   actionButton(inputId = "confirmFacetLevel",
+                                label = "confirm facet levels")
+                 ),
+                 actionButton("runDstudyButton", "dstudy estimate"),
+                 actionButton("runDstudyBootButton", "bootstrap estimate"),
+                 progressBar(id = "dstudybar", value = 0, total = 100),
+                 ### 下载按钮dstudy
+                 conditionalPanel(
+                   condition = "input.runDstudyButton >=1",
+                   downloadButton("downloadDstudyResult",
+                                  "Download dstudy result")
+                 ),
+                 conditionalPanel(
+                   condition = "input.runDstudyBootButton >=1",
+                   downloadButton("downloadDstudyBootResult",
+                                  "Download bootstrap result")
+                 ),
                ),
              ),
-             # Output panel: gstudy / dstudy ----
+             ### UI for gstudy / dstudy output ----
              mainPanel(
                conditionalPanel(
-                 condition = "input.runRecommModel >= 1",
+                 condition = "input.runGstudyButton >= 1",
                  h4("Gstudy Output："),
                  h5("Fixed Effects Output："),
                  verbatimTextOutput("recommModelFixedEffectResult"),
                  h5("Random Effects Output："),
-                 verbatimTextOutput("recommModelGStudyResult")
+                 verbatimTextOutput("GstudyResultPrint")
                ),
                # gstudy with bootstrapping SD
                conditionalPanel(
-                 condition = "input.runRecommModelBoot >= 1",
+                 condition = "input.runGstudyBootButton >= 1",
                  h4("Estimate Bootstrapping SD for G-study："),
                  verbatimTextOutput("recommModelGStudyBootResult")
                ),
                conditionalPanel(
-                 condition = "input.runRecommModelDstudy >= 1",
+                 condition = "input.runDstudyButton >= 1",
                  h4("Dstudy Output："),
                  p("Sample Size:"),
                  verbatimTextOutput("updatedN"),
@@ -333,7 +318,7 @@ ui <- navbarPage(
                ),
                # dstudy with bootstrapping SD
                conditionalPanel(
-                 condition = "input.runRecommModelDstudyBoot >= 1",
+                 condition = "input.runDstudyBootButton >= 1",
                  h4("Estimate Bootstrapping SD for D-study："),
                  verbatimTextOutput("recommModelDStudyBootResult")
                ),
@@ -346,7 +331,7 @@ ui <- navbarPage(
 )
 
 
-# Define server logic required to draw a histogram
+# Server -----------------------------------------------------------------
 server <- function(input, output, session) {
   # 上传数据
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
@@ -356,7 +341,7 @@ server <- function(input, output, session) {
   output$nRowsSelection <- renderUI({ # 选择多少行代表Facet Tags，每一行代表一个facet
     selectInput(
       "nRows",
-      "How many rows represent tages of facets except headings? By default, heading reprents the only facet. For more than one facet, you should have same number of tagging rows as number of facets. Each row represents each facet.",
+      "Select the number of rows containing facets (not including headings)",
       choices = 0:nrow(datRaw()),
       selected = 0
     )
@@ -364,14 +349,14 @@ server <- function(input, output, session) {
   
   output$TagNamesText <- renderUI({
     textInput("TagNames",
-              "What are names of your facets (for example, for two facets — Occasion and Item, simply type in `Item;Occasion`. Note that the sequence of names should be same as the sequence of prefix below and rows in your data. If only one facet exsit, type `Item`.)",
-              "Occasion;Item")
+              "Enter facet's names seperated by `,` (for example, `Occasion,Item`)",
+              "Occasion,Item")
   })
   
   output$preFixText <- renderUI({ # 为facets选择prefix
     textInput("TagPreFix", 
-              "What are prefix of facet(s) to identify levels of each facet（for example, for two facets — Occasion and Item, you may want to label levels of Occasion as I1/I2/I3 and levels of Occasion as O1/O2/O3, then you can type in `I;O`. If only one facet exsit, type `I`.", 
-              value = "O;I")
+              "Enter prefix of facet levels seperated by `,`（for example, `O,I`)" , 
+              value = "O,I")
   })
   
   
@@ -380,7 +365,14 @@ server <- function(input, output, session) {
     datRaw()
   })
   
-  # tag/ID information---------------------
+  
+  ## Server for Page 1: Wide-to-long transformation  ----------------------------------------
+  #------------#
+  # A bunch of reactive values:
+  ## NText: 有多少行是tag/ID
+  ## preFixText: tag的前綴是什麼比如第四個item—I4，為I
+  ## TagNamesText: facet的name比如：Class;Rater;Item
+  #------------#
   NText = reactive({
     input$nRows
   }) # 有多少行是tag/ID
@@ -391,32 +383,36 @@ server <- function(input, output, session) {
     input$TagNames
   }) # facet的name比如：Class;Rater;Item
   
+  
   observeEvent(datRaw(), {dat <<- datRaw()})
     
-
+  #------------#
+  # Transformation logic
+  ## 若觀察到用戶點擊"transform"按鈕,判斷是否提供了tag前綴(比如I)和tag名字(比如Item)
+  ## 分支（1）：若tag前綴和tag名字都提供，將tag前綴和tag名字分離。判斷用戶提供的tag行數數目
+  ### 分支（1.1）: 若tag行數數目為0，默認用戶tag信息放在heading裡面。直接用tag前綴進行transform。
+  ### 分支（1.2）: 若tag行數數目大於0，默認用戶tag信息不放在heading裡面，而在數據的前N行。將前N行tag合併成一個特殊tag ID(mergeID)進行transform。mergeID將不同facet的tag用下劃線進行區別。最後再將mergeID分離成好幾個facet列。每一列都冠以tagNames。
+  ## 分支（2）：若tag前綴和tag名字都不提供且tag行數（NText）為0。則直接將除一個列（ID）以外的列進行transform。適用於single facet design。
+  #------------#
+  
   observeEvent(input$transform, {
     N = as.numeric(NText())
-    if (preFixText() != "" & TagNamesText() != "") { #如果preFix和TagNames都提供
-      TagPreFix <- str_split(preFixText(), ";")[[1]]
-      TagNames <- str_split(TagNamesText(), ";")[[1]]
-      # browser()
-      if (N == 0) { # 如果没有facet行，默认facet藏在heading里且为single facet,将PreFix开头的转化为long，冠以TagNames
+    if (preFixText() != "" & TagNamesText() != "") { #分支1.如果preFixText和TagNames都提供
+      TagPreFix <- str_split(preFixText(), ",")[[1]]
+      TagNames <- str_split(TagNamesText(), ",")[[1]]
+      if (N == 0) { # 分支1.1：如果没有facet行，默认facet藏在heading里且为single facet,将PreFix开头的转化为long，冠以TagNames
         if (length(TagPreFix) > 1) {
           shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
         }
         if (sum(str_detect(colnames(datRaw()), pattern = TagPreFix)) == 0 ) {
           shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
         }
-        
         dat <<- dplyr::tibble(datRaw()) |> 
           pivot_longer(starts_with({{TagPreFix}}), names_to = TagNames, values_to = "Score")
-        
-      }else if (N > 0){ # 如果有facet行，将tags of facet转换为合并的ID再进行long-format转化
+      }else if (N > 0){ # 分支1.2:如果有facet行，将tags of facet转换为合并的ID再进行long-format转化
         tags = datRaw()[1:N, -1] # 取出levels名字
         # 将所有facets合并成特殊ID
-        # browser()
         mergedID = apply(tags, 2, \(x) paste0(x, collapse = "_"))
-        
         dat_FacetNameOmitted <- dplyr::tibble(datRaw()[-(1:N), ]) # 去掉了facet信息的纯数据
         colnames(dat_FacetNameOmitted) <- c("ID", mergedID)
         
@@ -439,33 +435,21 @@ server <- function(input, output, session) {
     })
   })
   
-  # Server for tag page 2 ----------------------------------------------------
-  ## Reaction values: Facets / Covariates / Outcome ----
+  ## Server for Page 2: Auto detect design of data ----------------------------------------------------
+  ### Read in user-selected facets / outcomes / ID ----------------------------------------
+  unit = reactive({input$selectedID}) ## ID
+  selectedOutcome = reactive({input$selectedOutcome}) ## Outcome (i.e., Score)
+  selectedFacet = reactive({input$selectedMultipleFacets}) ## Facets used for gstudy/dstudy
+  selectedCovariates = reactive({input$selectedCovariates}) ## covariates for fixed effects
+  selectedFixedFacet = reactive({input$selectedFixedFacet}) ## mgtheory: fixed facet
+  selectedMissingMethod = reactive({input$missingMethod}) ## selected missing data handling method
   
-  unit = reactive({
-    input$selectedID
-  })
-  selectedFacet = reactive({
-    input$selectedMultipleFacets
-  })
-  selectedCovariates = reactive({
-    input$selectedCovariates
-  })
-  selectedOutcome = reactive({
-    input$selectedOutcome
-  })
-  selectedFixedFacet = reactive({
-    input$selectedFixedFacet
-  })
-  selectedSubtest = reactive({
-    input$selectedSubtest
-  })
-  
+  ### Selection UI for user-selected facets / outcomes / ID----------------------------------------
   # 选择ID
   output$selectedID <- renderUI({
     selectInput(
       "selectedID",
-      "1. Which variable represents ID:",
+      "1. Select ID:",
       choices = colnames(dat),
       selected = colnames(dat)[1]
     )
@@ -475,9 +459,9 @@ server <- function(input, output, session) {
   output$selectedOutcome <- renderUI({
     selectInput(
       "selectedOutcome",
-      "2. Which variable represents outcome:",
-      choices = colnames(dat),
-      selected = colnames(dat)[1]
+      "2. Select outcome:",
+      choices = setdiff(colnames(dat), input$selectedID),
+      selected = setdiff(colnames(dat), input$selectedID)[1]
     )
   })
   
@@ -485,9 +469,9 @@ server <- function(input, output, session) {
   output$selectedMultipleFacets <- renderUI({
     checkboxGroupInput(
       "selectedMultipleFacets",
-      "3. Which column(s) represent facet(s):",
-      choices = colnames(dat),
-      selected = NULL
+      "3. Select facet(s):",
+      choices = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
+      selected = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome))
     )
   })
   
@@ -495,12 +479,22 @@ server <- function(input, output, session) {
   output$selectedCovariates <- renderUI({
     checkboxGroupInput(
       "selectedCovariates",
-      "(Optional) Which column(s) represent covariates:",
-      choices = colnames(dat),
+      "(Optional) Select covariate(s):",
+      choices = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
       selected = NULL
     )
   })
   
+  # mgTheory选择fixed facet
+  output$selectedFixedFacet <- renderUI({
+    selectInput(
+      "selectedFixedFacet",
+      "5. Select fixed facet:",
+      choices = selectedFacet(),
+      selected = selectedFacet()[1]
+    )
+  })
+ 
   ## missing data server
   observeEvent(input$variableSettingConfirm, {
     method = selectedMissingMethod()
@@ -516,24 +510,6 @@ server <- function(input, output, session) {
     }
   })
   
-  # mgTheory选择fixed facet
-  output$selectedFixedFacet <- renderUI({
-    checkboxGroupInput(
-      "selectedFixedFacet",
-      "5. Which column represent fixed facet:",
-      choices = selectedFacet(),
-      selected = selectedFacet()
-    )
-  })
-  
-  output$selectedSubtest <- renderUI({
-    checkboxGroupInput(
-      "selectedSubtest",
-      "6. Which column represent subtest:",
-      choices = selectedFacet(),
-      selected = selectedFacet()
-    )
-  })
   
   ##  nestedStrc: automatically detect design of data and return structure table-----
   nestedStrc <- eventReactive(input$variableSettingConfirm, {
@@ -563,115 +539,85 @@ server <- function(input, output, session) {
   ## If there is only one facet, generate a formula as (1 | Person) + (1 | Facet)
   ## ----------------------------- ##
   
-  gtheoryFormula <- reactive({
+  ### gtheory formula ----------------------------------------
+  #------------#
+  # 若點擊確認(confirm)按鈕，根據design structure進行逐行掃描:
+  ## 分支1: 若design structure為單列，則為single facet。進行下列操作:
+  ##        1, 生成selectedOutcome() ~ (1 | unit()) + (1 | selectedFacet())
+  ## 分支2: 若design structure為多列，則為multiple facets。
+  ### 分支2.1: 若是univariate gtheory （input$mGtheory == FALSE）
+  ### 分支2.2: 若是multivariate gtheory （input$mGtheory == TRUE）
+  #------------#
+  
+  gtheoryFormula <- eventReactive(input$variableSettingConfirm, {
     nestedStrcTable <- nestedStrc() # load nested structure
     formularFacets <- NULL
     
-    if (ncol(nestedStrcTable) > 1) { # 若不是single facet
-      for (r in 1:nrow(nestedStrcTable)) {
-        if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
-          formularFacets <-
-            c(formularFacets,
-              paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
-        }
-        if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
-          tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
-          nested <-
-            !any(apply(tab, 1, function(x)
-              sum(x != 0) > 1))
-          if (nested) {
+    if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
+      
+      formularText <- paste0(selectedOutcome(), " ~ (1 |", unit(), ") + ", "(1 |", selectedFacet(), ")") 
+      
+    }else if (ncol(nestedStrcTable) > 1) { # 分支2:multiple facets
+      
+      if (input$mGtheory == FALSE) { # 分支2.1: univariate gtheory
+        for (r in 1:nrow(nestedStrcTable)) {
+          if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
             formularFacets <-
-              c(
-                formularFacets,
-                paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
-                paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
-                paste0(
-                  "(1 | ",
-                  paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),
-                  ")"
+              c(formularFacets,paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
+          }
+          if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
+            tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
+            nested <-
+              !any(apply(tab, 1, function(x)
+                sum(x != 0) > 1))
+            if (nested) {
+              formularFacets <-
+                c(
+                  formularFacets,
+                  paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
+                  paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
+                  paste0(
+                    "(1 | ",paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),")"
+                  )
                 )
-              )
-          } else{
-            formularFacets <-
-              c(formularFacets,
-                paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
-                paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
-                paste0("(1 | ", paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]), ")"))
+            } else{
+              formularFacets <-
+                c(formularFacets,
+                  paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
+                  paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
+                  paste0("(1 | ", paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]), ")"))
+            }
           }
         }
+        ## add covariates and facets into the formulate
+        formularText <- paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
+        formularText <- paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", formularText) 
+        formularText
+      }else{ # 分支2.2: multivariate gtheory
+        fixedfacet <- selectedFixedFacet()
+        randomfacets <- setdiff(selectedFacet(), fixedfacet)
+        formularRHS <- paste0("us(", fixedfacet, " + 0 | ", c(unit(), randomfacets), ")", collapse = " + ")
+        formularText <- paste0(selectedOutcome(), " ~ ", formularRHS)
+        formularText
       }
-      ## add covariates and facets into the formulate
-      formularText <- paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
-      formularText <- paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", formularText) 
-      formularText
-    }else{ # 若是single facet
-      formularText <- paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", "(1 |", colnames(nestedStrcTable), ")") 
+    }else{ 
+      NULL
     }
-    
-})
-  
-  ## mGtheory formula
-  mgtheoryFormula <- reactive({
-    nestedStrcTable <- nestedStrc() # load nested structure
-    formularFacets <- NULL
-    
-    for (r in 1:nrow(nestedStrcTable)) {
-      if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
-        formularFacets <-
-          c(formularFacets,
-            paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
-      }
-      if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
-        tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
-        nested <-
-          !any(apply(tab, 1, function(x)
-            sum(x != 0) > 1))
-        if (nested) {
-          formularFacets <-
-            c(
-              formularFacets,
-              paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
-              paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
-              paste0(
-                "(1 | ",
-                paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),
-                ")"
-              )
-            )
-        } else{
-          formularFacets <-
-            c(
-              formularFacets,
-              paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
-              paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
-              paste0(
-                "(1 | ",
-                paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]),
-                ")"
-              )
-            )
-        }
-      }
-    }
-    ## add covariates and facets into the formulate
-    
-    paste0("us(", selectedFixedFacet(), " | ", selectedSubtest(), ")")
-    formularText <-
-      paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
-    
-    paste0(selectedOutcome(),
-           " ~ (1 |",
-           input$selectedID,
-           ") + ",
-           formularText)
   })
   
-  # Tabset2: 显示表格
+  ### Present simplifed fomular text ----------------------------------------
+  output$recommFormular <- renderText({
+    makeeasyformular(gtheoryFormula())
+    #gtheoryFormula()
+  })
+  
+  ### Present data design table and sample size for each level of facet ----------------------------------------
   observeEvent(input$variableSettingConfirm, {
     # 表格打印： facet嵌套
     output$nestedStrucTable <- renderDT({
       nestedStrc()
     })
+    
     # 表格打印： 总结样本量
     output$factorNestTable <- renderDT({
       facets  <- selectedFacet()
@@ -682,41 +628,79 @@ server <- function(input, output, session) {
     })
   })
   
-  # Running recommended model ------------------------------------------------------------------
-  selectedMissingMethod = reactive({
-    input$missingMethod
-  })
+  ## Running recommended model ------------------------------------------------------------------
+  #------------#
+  # 分支1: 若為univariate gstudy，運行lmer
+  # 分支2: 若為multivariate gstudy，運行lmmTMB::glmmTMB
+  #------------#
   
-  output$recommFormular <- renderText({
-    makeeasyformular(gtheoryFormula())
-  })
-  
-  gstudyResult <- eventReactive(input$runRecommModel, {
+  ### Run gstudy  ----------------------------------------
+  gstudyResult <- eventReactive(input$runGstudyButton, {
     nFacet <- NULL
-    datG <- dat
-    
+    datG <- dat # data used for gstudy
+    ## make sure outcome as numeric and facet as factors
     datG[[selectedOutcome()]] <- as.numeric(dat[[selectedOutcome()]])
-    
     datG[c(input$selectedID, selectedFacet())] <-
       lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
-    if (input$selfFormular == "") {
-      formulaRecomm <- as.formula(gtheoryFormula())
-      lme4.res <<- lmer(data = datG, formula = formulaRecomm)
-    } else{
-      lme4.res <<-
-        lmer(data = datG,
-             formula = as.formula(makehardformular(input$selfFormular)))
+    
+    if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
+      if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
+        formulaRecomm <- as.formula(gtheoryFormula())
+        lmmFit <<- lmer(data = datG, formula = formulaRecomm)
+      } else{ # 分支1.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
+        lmmFit <<-
+          lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
+      }
+      ## fixed effect
+      fixedEffectEstimate <<- fixef(lmmFit)
+      ## Random effects
+      randomEffectEstimate <- ranef(lmmFit)
+      randomEffectLevel <- lapply(lapply(datG, unique), length)
+      nFacet <<- unlist(randomEffectLevel[selectedFacet()])
+      gstudy(lmmFit)$gstudy.out
+      
+    }else{# 分支2: 若為multivariate gstudy
+      if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
+        formulaTxt <- gtheoryFormula()
+        formulaRecomm <- as.formula(formulaTxt)
+        lmmFit <- glmmTMB::glmmTMB(
+          data = datG,
+          formula = formulaRecomm,
+          family = gaussian,
+          dispformula = ~0
+        )
+        ## extract residual var-cov matrix
+        residuals_Person <- cbind(residuals = residuals(lmmFit, "response"), 
+                                  datG[c(unit(), selectedFacet())]) %>% 
+          pivot_wider(names_from = selectedFixedFacet(), values_from = residuals, names_prefix = "facet") %>% 
+          ungroup()
+        residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
+        
+        ## run second time
+        dat2 = datG
+        dat2$Residual = residuals(lmmFit, "response")
+        formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
+        formulaRecommWtResid <- as.formula(formulaWtResidTxt)
+        lmmFit <- glmmTMB::glmmTMB(
+          formula = formulaRecommWtResid,
+          data =  dat2,
+          family = gaussian,
+          dispformula =~0
+        )
+        ## fixed effect
+        fixedEffectEstimate <<- fixef(lmmFit)
+        
+        res <- lme4::VarCorr(lmmFit)
+        resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
+        resDat
+      } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
+  
+      }
     }
-    ## fixed effect
-    fixedEffectEstimate <<- fixef(lme4.res)
-    ## Random effects
-    randomEffectEstimate <- ranef(lme4.res)
-    randomEffectLevel <- lapply(lapply(datG, unique), length)
-    nFacet <<- unlist(randomEffectLevel[selectedFacet()])
-    gstudy(lme4.res)
   })
   
-  dstudyResult <- eventReactive(input$runRecommModelDstudy, {
+  ### Run dstudy ----------------------------------------
+  dstudyResult <- eventReactive(input$runDstudyButton, {
     datD <- dat
     datD[[selectedOutcome()]] <-
       as.numeric(datD[[selectedOutcome()]])
@@ -724,19 +708,19 @@ server <- function(input, output, session) {
       lapply(datD[c(input$selectedID, selectedFacet())], as.factor)
     
     if (input$selfFormular == "") {
-      lme4.res <-
+      lmmFit <-
         lmer(data = datD, formula = as.formula(gtheoryFormula()))
     } else{
-      lme4.res <-
+      lmmFit <-
         lmer(data = datD,
              formula = as.formula(makehardformular(input$selfFormular)))
     }
-    gstudy.res <- gstudy(lme4.res)
+    gstudy.res <- gstudy(lmmFit)
     dstudy(x = gstudy.res, n = nFacet, unit = unit())
   })
   
   ## with Bootstrapping
-  gstudyResultBoot <- eventReactive(input$runRecommModelBoot, {
+  gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
     datGBoot <- dat
     gstudy.res <- gstudyResult()
     datGBoot[[selectedOutcome()]] <-
@@ -745,16 +729,16 @@ server <- function(input, output, session) {
       lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
     if (input$selfFormular == "") {
       formulaRecomm <- as.formula(gtheoryFormula())
-      lme4.res <- lmer(data = datGBoot, formula = formulaRecomm)
+      lmmFit <- lmer(data = datGBoot, formula = formulaRecomm)
     } else{
-      lme4.res <-
+      lmmFit <-
         lmer(data = datGBoot,
              formula = as.formula(makehardformular(input$selfFormular)))
     }
     
     boot.gstudy <<-
       lme4::bootMer(
-        lme4.res,
+        lmmFit,
         gstudy.forboot,
         nsim = input$nboot,
         use.u = FALSE,
@@ -770,7 +754,7 @@ server <- function(input, output, session) {
   })
   
   dstudyResultBoot <-
-    eventReactive(input$runRecommModelDstudyBoot, {
+    eventReactive(input$runDstudyBootButton, {
       datDBoot <- dat
       datDBoot[[selectedOutcome()]] <-
         as.numeric(datDBoot[[selectedOutcome()]])
@@ -838,32 +822,48 @@ server <- function(input, output, session) {
   
   
   
-  ###################### dstudy:显示facets的levels
   
-  ###################### 打印模型结果
-  observeEvent(input$runRecommModel, {
+  ## Present results of gstudy  ----------------------------------------
+  observeEvent(input$runGstudyButton, {
     i = 0
-    output$recommModelGStudyResult <- renderPrint({
-      gstudy.out <- gstudyResult()
-      
-      gstudy.out$gstudy.out
-    })
-    output$recommModelFixedEffectResult <- renderPrint({
-      fixedEffectEstimate
-    })
     
-    ## add UI for 选择facet
-    selectedFacetForLevel <-
-      reactive({
-        input$selectedFacetValue
-      })
-    output$selectedFacetMenu <- renderUI({
-      allfacets <- selectedFacet()
-      selectInput(inputId = "selectedFacet",
-                  label = "Select the facet to change",
-                  choices = allfacets)
-    })
+    #------------#
+    # Present gstudy results and fixed effects
+    #------------#
+    output$GstudyResultPrint <- renderPrint({gstudyResult()})
+    output$recommModelFixedEffectResult <- renderPrint({fixedEffectEstimate})
     
+    i = 100
+    updateProgressBar(
+      id = "gstudybar",
+      status = "success",
+      value = i,
+      total = 100,
+      title = paste0("Process ", i, "%")
+    )
+    
+    ### Download buttons for gstudy / dstudy----------------------------------------
+    ## 可下载的表格 downloadGstudyResult
+    output$downloadGstudyResult <- downloadHandler(
+      filename = "gstudyResult.csv",
+      content = function(file) {
+        write.csv(gstudyResult()$gstudy.out, file, row.names = FALSE)
+      }
+    )
+    ## 可下载的表格 downloadGstudyTheta
+    output$downloadGstudyTheta <- downloadHandler(
+      filename = "thetaEstimates.csv",
+      content = function(file) {
+        write.csv(extractTheta(lmmFit), file, row.names = FALSE)
+      }
+    )
+  })
+  
+  ## Present results of dstudy ----------------------------------------
+  observeEvent(input$runDstudyButton, {
+    i = 0
+    
+    ### UI for dstudy ----------------------------------------
     observeEvent(input$selectedFacet, {
       output$selectedFacetLevels <- renderUI({
         whichfacet <<- input$selectedFacet
@@ -881,37 +881,18 @@ server <- function(input, output, session) {
       })
     })
     
+    selectedFacetForLevel <- reactive({input$selectedFacetValue})
+    
+    output$selectedFacetMenu <- renderUI({
+      selectInput(inputId = "selectedFacet",
+                  label = "Select the facet to change",
+                  choices = selectedFacet())
+    })
+    
     observeEvent(input$confirmFacetLevel, {
       nFacet[whichfacet] <<- whichValue
     })
     
-    i = 100
-    updateProgressBar(
-      id = "gstudybar",
-      status = "success",
-      value = i,
-      total = 100,
-      title = paste0("Process ", i, "%")
-    )
-    
-    ## 可下载的表格 downloadGstudyResult
-    output$downloadGstudyResult <- downloadHandler(
-      filename = "gstudyResult.csv",
-      content = function(file) {
-        write.csv(gstudyResult()$gstudy.out, file, row.names = FALSE)
-      }
-    )
-    ## 可下载的表格 downloadGstudyTheta
-    output$downloadGstudyTheta <- downloadHandler(
-      filename = "thetaEstimates.csv",
-      content = function(file) {
-        write.csv(extractTheta(lme4.res), file, row.names = FALSE)
-      }
-    )
-  })
-  
-  observeEvent(input$runRecommModelDstudy, {
-    i = 0
     dstudy.out <- dstudyResult()
     output$recommModelDStudyResult <- renderPrint({
       print.dStudy(dstudy.out)
@@ -929,19 +910,16 @@ server <- function(input, output, session) {
     )
     
     ## 可下载的表格 downloadGstudyResult
-    colnames(dstudy.out$ds.df) <-
-      c("Source", "Est.Variance", "N", "Est.(Var/N)")
+    colnames(dstudy.out$ds.df) <-c("Source", "Est.Variance", "N", "Est.(Var/N)")
+    
     output$downloadDstudyResult <- downloadHandler(
       filename = "dstudyResult.csv",
-      content = function(file) {
-        write.csv(dstudy.out$ds.df, file, row.names = FALSE)
-      }
+      content = function(file) {write.csv(dstudy.out$ds.df, file, row.names = FALSE)}
     )
-    
   })
   
-  # observe Bootstrapping and output
-  observeEvent(input$runRecommModelBoot, {
+  ## Present Gstudy bootstrapping results ----------------------------------------
+  observeEvent(input$runGstudyBootButton, {
     gstudy.res_boot <- gstudyResult() # place holder
     boot.gstudy.res <- gstudyResultBoot()
     # calculate bootstrap CI
@@ -968,7 +946,7 @@ server <- function(input, output, session) {
     
   })
   
-  observeEvent(input$runRecommModelDstudyBoot, {
+  observeEvent(input$runDstudyBootButton, {
     dstudy.res_boot <- dstudyResultBoot()
     colnames(dstudy.res_boot$ds.df) <-
       c("Source",

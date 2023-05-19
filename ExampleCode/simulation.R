@@ -2,8 +2,8 @@ library(tidyverse)
 library(MASS)
 set.seed(20230212)
 
-n_Person = 100
-n_Item = 100
+n_Person = 50
+n_Item = 20
 n_Facet = 4
 
 ## Set prior parameters
@@ -41,16 +41,14 @@ dat <- conditions %>%
   mutate(
     Person_ID = factor(Person_ID, levels = 1:n_Person),
     Item_ID = factor(Item_ID, levels = 1:n_Item),
-    Occasion = factor(Occasion, levels = 1:n_Facet))
+    Occasion = factor(Occasion, levels = 1:n_Facet)) |> 
+  select(-case)
 
-head(dat, 20)
-write.csv(dat, "FullyCrossedData.csv", row.names = FALSE)
+glimpse(dat)
+# write.csv(dat, "data/mGtheoryData.csv", row.names = FALSE)
+write.csv(dat, "data/mGtheoryDataShort.csv", row.names = FALSE)
 library(glmmTMB)
 library(lme4)
-
-res <- lmer(Score ~ (0 + Occasion | Person_ID) + (0 + Occasion | Item_ID) , data = dat)
-summary(res)
-gstudy(res, fixed = "Occasion")
 
 # first run ---------------------------------------------------------------
 m2_mGT <- as.formula("Score ~ us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) ")
@@ -70,8 +68,8 @@ residual_cor
 # second run  -------------------------------------------------------------
 dat2 = dat
 dat2$Residual = residuals(m2_mGT_fit, "response")
-m2_mGT2 <- as.formula("Score ~ 0 + us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) + 
-                      diag(Occasion + 0 | Residual)")
+glimpse(dat2)
+m2_mGT2 <- as.formula("Score ~ 0 + us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) + diag(Occasion + 0 | Residual)")
 m2_mGT_fit2 <- glmmTMB::glmmTMB(m2_mGT2, dat2, family = gaussian, dispformula = ~0)
 m2_mGT_fit2
 res <- lme4::VarCorr(m2_mGT_fit2)
