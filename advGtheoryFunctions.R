@@ -138,7 +138,7 @@ print.gStudy <- function(x, ...){
 #' two_facet_gstudy <- gstudy(two_facet)
 #' dstudy(two_facet_gstudy, n = c("raters" = 2, "prompts" = 5), unit = "students")
 #'
-#' ## Two facet fixed design wtih prompt
+#' ## Two facet fixed design with prompt
 #' gstudy_fixed_prompt <- gstudy(two.facet, fixed = "prompts")
 #' dstudy(gstudy_fixed_prompt, n = c("raters" = 2), unit = "students")
 #' @export

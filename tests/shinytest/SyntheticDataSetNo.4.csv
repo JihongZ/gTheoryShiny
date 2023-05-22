@@ -1,6 +1,5 @@
-"Person","Task1;Rater1","Task1;Rater2","Task1;Rater3","Task1;Rater4","Task2;Rater5","Task2;Rater6","Task2;Rater7","Task2;Rater8","Task3;Rater9","Task3;Rater10","Task3;Rater11","Task3;Rater12"
-NA,"Task1","Task1","Task1","Task1","Task2","Task2","Task2","Task2","Task3","Task3","Task3","Task3"
-NA,"Rater1","Rater2","Rater3","Rater4","Rater5","Rater6","Rater7","Rater8","Rater9","Rater10","Rater11","Rater12"
+"Person","t1","t1","t1","t1","t2","t2","t2","t2","t3","t3","t3","t3"
+"Person","r1","r2","r3","r4","r5","r6","r7","r8","r9","r10","r11","r12"
 "1","5","6","5","5","5","3","4","5","6","7","3","3"
 "2","9","3","7","7","7","5","5","5","7","7","5","2"
 "3","3","4","3","3","5","3","3","5","6","5","1","6"
