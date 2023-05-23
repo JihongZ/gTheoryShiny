@@ -265,11 +265,12 @@ ui <- navbarPage(
                  h4("Dstudy："),
                  ### 选择要修改的facet
                  uiOutput("selectedFacetMenu"),
-                 #选择一个facet
+                 #选择一个facet的levels：可以用一个数字，也可以选择一串数字
                  uiOutput("selectedFacetLevels"),
+                 uiOutput("selectedMultipleFacetLevels"),
                  #选择factor levels
                  actionButton(inputId = "confirmFacetLevel",
-                              label = "Add facet levels for Dstudy"),
+                              label = "Add facet levels"),
                  actionButton("runDstudyButton", "Run"),
                  actionButton("runDstudyBootButton", "Run bootstrapping"),
                  progressBar(id = "dstudybar", value = 0, total = 100),
@@ -710,7 +711,7 @@ server <- function(input, output, session) {
   selectedFacetForDstudy <- reactive({input$FacetDStudySelector})
 
   observeEvent(input$runDstudyBox, {
-    #### Reactive values for facet and levels  ----------------------------------------
+    #### Output UI for facet and levels selection  ----------------------------------------
     observeEvent(input$confirmFacetLevel, {
       updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
       output$updatedNDT <- renderDT({
@@ -723,25 +724,33 @@ server <- function(input, output, session) {
     #------------#
     output$selectedFacetMenu <- renderUI({
       selectInput(inputId = "FacetDStudySelector",
-                  label = "Select the facet to change sample sizes:",
+                  label = "Select facet:",
                   choices = selectedFacet(),
                   multiple = FALSE)
     })
 
     #------------#
-    # Select sample size for selected facet
+    # Ongoing: Select levels for target facet
     #------------#
     observeEvent(input$FacetDStudySelector, {
        output$selectedFacetLevels <- renderUI({
-        sliderInput(
+        numericInput(
           inputId = "FacetValueSlider",
-          label = "Enter target level for facet: ",
+          label = "Enter target level: ",
+          value = defaultN[selectedFacetForDstudy()],
           min = 0,
           max = 100,
-          value = 0
+          step = 10
         )
       })
-    })
+
+      output$selectedMultipleFacetLevels <- renderUI({
+        textInput(
+          inputId = "FacetValueRange",
+          label = "(Optional) Enter level's range (e.g., 100:200:10): ",
+          value = ""
+        )
+      })
 
   })
   
