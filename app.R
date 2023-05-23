@@ -328,6 +328,7 @@ ui <- navbarPage(
 server <- function(input, output, session) {
   # 上传数据
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
+  dat <- reactive({datRaw()})
   
   # 把数据转化为长数据
   # 按下"transform"按钮后，将原始数据转换为长数据格式:
@@ -378,7 +379,8 @@ server <- function(input, output, session) {
   }) # facet的name比如：Class;Rater;Item
   
   
-  observeEvent(datRaw(), {dat <<- datRaw()})
+  # dat <- eventReactive(input$transform, {datRaw()})
+  # observeEvent(datRaw(), {dat <<- datRaw()})
     
   #------------#
   # Transformation logic
@@ -439,6 +441,7 @@ server <- function(input, output, session) {
   selectedMissingMethod = reactive({input$missingMethod}) ## selected missing data handling method
   
   ### Selection UI for user-selected facets / outcomes / ID----------------------------------------
+  
   # 选择ID
   output$selectedID <- renderUI({
     selectInput(
@@ -643,10 +646,10 @@ server <- function(input, output, session) {
         formulaRecomm <- as.formula(gtheoryFormula())
         lmmFit <<- lmer(data = datG, formula = formulaRecomm)
       } else{ # 分支1.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
-        lmmFit <<-
-          lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
+        lmmFit <<- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
       }
       ## fixed effect
+      
       fixedEffectEstimate <<- fixef(lmmFit)
       ## Random effects
       randomEffectEstimate <- ranef(lmmFit)
@@ -692,22 +695,21 @@ server <- function(input, output, session) {
       }
     }
   })
-  
+  # 
   ### Run dstudy ----------------------------------------
   #### Facet Selection UI for dstudy ----------------------------------------
   #------------#
-  # Default Facets levels in gstudy
+  # 当选好facet按下confirm按钮时，Read in default Facets levels in gstudy (defaultN)
   #------------#
-  observeEvent(input$runDstudyBox, {
-     defaultN <<- sapply(dat[selectedFacet()], n_distinct)
-     updatedN <<- defaultN
+  observeEvent(input$variableSettingConfirm, {
+      defaultN <<- sapply(dat[selectedFacet()], n_distinct)
+      updatedN <<- defaultN
   })
   
   selectedFacetValue <- reactive({input$FacetValueSlider})
   selectedFacetForDstudy <- reactive({input$FacetDStudySelector})
-  
+
   observeEvent(input$runDstudyBox, {
-    
     #### Reactive values for facet and levels  ----------------------------------------
     observeEvent(input$confirmFacetLevel, {
       updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
@@ -715,7 +717,7 @@ server <- function(input, output, session) {
         data.frame(New = updatedN, old = defaultN)
       })
     })
-    
+
     #------------#
     # Select which facet to add sample size
     #------------#
@@ -725,7 +727,7 @@ server <- function(input, output, session) {
                   choices = selectedFacet(),
                   multiple = FALSE)
     })
-    
+
     #------------#
     # Select sample size for selected facet
     #------------#
@@ -740,7 +742,7 @@ server <- function(input, output, session) {
         )
       })
     })
-    
+
   })
   
   dstudyResult <- eventReactive(input$runDstudyButton, {
