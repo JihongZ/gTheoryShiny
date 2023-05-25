@@ -712,6 +712,9 @@ server <- function(input, output, session) {
 
   observeEvent(input$runDstudyBox, {
     #### Output UI for facet and levels selection  ----------------------------------------
+    ## ----------------------------- ##
+    ## 当按下确认Facet Level键
+    ## ----------------------------- ##
     observeEvent(input$confirmFacetLevel, {
       updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
       output$updatedNDT <- renderDT({
@@ -733,25 +736,33 @@ server <- function(input, output, session) {
     # Ongoing: Select levels for target facet
     #------------#
     observeEvent(input$FacetDStudySelector, {
+      ###### --- 
+      # Facet levels slider for selected Facet
+      ###### ---
        output$selectedFacetLevels <- renderUI({
         numericInput(
           inputId = "FacetValueSlider",
           label = "Enter target level: ",
           value = defaultN[selectedFacetForDstudy()],
           min = 0,
-          max = 100,
+          max = defaultN[selectedFacetForDstudy()] * 10,
           step = 10
         )
       })
-
+       
+      ###### --- 
+      # Facet levels range for dstudy plot
+      ###### --- 
       output$selectedMultipleFacetLevels <- renderUI({
         textInput(
           inputId = "FacetValueRange",
-          label = "(Optional) Enter level's range (e.g., 100:200:10): ",
-          value = ""
+          label = "(Optional) Enter level's range: ",
+          value = "",
+          placeholder = "For example, 100:200:10 represents from 100 to 200 with step 10"
         )
       })
 
+    })
   })
   
   dstudyResult <- eventReactive(input$runDstudyButton, {
