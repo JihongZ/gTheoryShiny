@@ -150,8 +150,8 @@ dstudy <- function(x, n, unit) {
   tmp <- tmp[c(1,2)]
   us.var <- tmp[tmp$Source %in% unit,2]
   n.matrix <- matrix(nrow = nrow(tmp), ncol = length(n))
-  for(i in 1:length(n)) n.matrix[grep(names(n)[i], tmp$Source),i] <- n[i]
-  n.matrix[nrow(n.matrix),] <- n
+  for(i in 1:length(n)) n.matrix[grep(names(n)[i], tmp$Source),i] <- as.numeric(n[i])
+  n.matrix[nrow(n.matrix),] <- as.numeric(n)
   tmp$n <- apply(n.matrix, 1, prod, na.rm = T)
   tmp[match(unit, tmp$Source), "n"] <- x$nobs
   tmp$vcov.n <- tmp$Est.Variance/tmp$n

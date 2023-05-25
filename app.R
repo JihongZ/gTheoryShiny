@@ -40,9 +40,9 @@ ui <- navbarPage(
       #
       h4("Example data:"),
       p(
-        span("Rajaratnam.2.new.csv", style = "color:blue"),
-        " is a example data with 4-way crossed/nested example. The facets include",
-        strong("Subset, Item, Rater, Ocasion"),
+        span("SyntheticDataSetNo.4.csv", style = "color:blue"),
+        " is a example data with two facets including",
+        strong("Test and Rater"),
         "; ID variable is",
         strong("Person"),
         "; Outcome variable is",
@@ -50,18 +50,6 @@ ui <- navbarPage(
         "."
       ),
       
-      p(
-        span("Rajaratnam.2.new.withCovariate.csv", style = "color:blue"),
-        " is similar to Rajaratnam.2.new except two covarites added. The facets include",
-        strong("Subset, Item, Rater, Ocasion"),
-        ";ID variable is",
-        strong("Person"),
-        "; Outcome variable is",
-        strong("Score"),
-        "; Covariates are",
-        strong("trait1 and trait2"),
-        "."
-      ),
       
       h4("Step 1: Load data and transformation"),
       p(
@@ -308,7 +296,7 @@ ui <- navbarPage(
                  condition = "input.runDstudyButton >= 1",
                  h4("Dstudy Output："),
                  p("Result:"),
-                 verbatimTextOutput("recommModelDStudyResult")
+                 verbatimTextOutput("recommModelDStudyResult"),
                ),
                # dstudy with bootstrapping SD
                conditionalPanel(
@@ -316,6 +304,7 @@ ui <- navbarPage(
                  h4("Estimate Bootstrapping SD for D-study："),
                  verbatimTextOutput("recommModelDStudyBootResult")
                ),
+              plotOutput("DstudyCoefPlot"),
              )
            ),),
   
@@ -795,14 +784,13 @@ server <- function(input, output, session) {
     datDBoot[[selectedOutcome()]] <- as.numeric(datDBoot[[selectedOutcome()]])
     datDBoot[c(input$selectedID, selectedFacet())] <- lapply(datDBoot[c(input$selectedID, selectedFacet())], as.factor)
     
-    gstudy.res <- gstudyResult()
+    # gstudy.res <- gstudy(lmmFit)
     boot.gstudy.res <- gstudyResultBoot()
     dstudy.res_boot <- dstudyResult() # placeholder
     
     boot.dstudy.res <- NULL
     for (i in 1:input$nboot) {
-      temp <- gstudy.res
-      temp[1]$gstudy.out[, 2] <- boot.gstudy.res[, -(1:3)][, i]
+      temp <- gstudy(lmmFit)
       temp.dstudy <- dstudy(temp, allRandomFacets, unit = unit())
       
       boot.dstudy.res <- rbind(
@@ -926,6 +914,61 @@ server <- function(input, output, session) {
     output$recommModelDStudyResult <- renderPrint({
       print.dStudy(dstudy.out)
     })
+    
+    ### g coefficient path plot across sample size -----
+    facetLevels = reactive({input$FacetValueRange})
+    if (facetLevels() != "") {
+      updatedNrange = updatedN ## assign N for dstudy to updatedNrange
+      facetLevelsRange <- reactive({input$FacetValueRange})
+      parms = as.numeric(str_split(facetLevelsRange(), ":")[[1]]) # parameters for generate levels
+      Levels_min = parms[1]
+      Levels_max = parms[2]
+      Levels_step = parms[3]
+      facetLevels = seq(from = Levels_min, to = Levels_max, step = Levels_step)
+      gcoefs = rep(NA, length(facetLevels))
+      dcoefs = rep(NA, length(facetLevels))
+      # loop over each level 
+      for (i in 1:length(facetLevels)) {
+        updatedNrange[selectedFacetForDstudy()] = facetLevels[i]
+        gstudy.res <- gstudy(lmmFit)
+        dstudy.res <- dstudy(x = gstudy.res, n = updatedNrange, unit = unit())
+        gcoefs[i] <- dstudy.res[["gcoef"]]
+        dcoefs[i] <- dstudy.res[["dcoef"]]
+      }
+      ###### --- 
+      # rho: generalizability coefficient
+      # Phi: phi coefficient or an index of dependability.
+      ###### ---
+      DstudyCoefData = data.frame(N = facetLevels, rho = gcoefs, Phi = dcoefs)
+      # browser()
+      output$DstudyCoefPlot <- renderPlot({
+        ticks = seq(0, 1, 0.02)
+        labels_point = seq(0, 1, 0.1)
+        ylabels = rep("", length(ticks))
+        for (i in seq(ticks)) {
+          if (as.character(ticks[i]) %in% as.character(labels_point)) {
+            ylabels[i] = ticks[i]
+          }
+        }
+        ggplot(DstudyCoefData) +
+          geom_line(aes(x = N, y = rho), alpha = 0.4) +
+          geom_text(aes(x = N, y = rho), label = "rho", parse = TRUE, size = 5) +
+          geom_line(aes(x = N, y = Phi), alpha = 0.4) +
+          geom_text(aes(x = N, y = Phi), label = "Phi", parse = TRUE, size = 5) +
+          labs(x = "Sample Size", y = "Coefficient", 
+               title = paste0(selectedFacetForDstudy(),": from ", Levels_min," to ", Levels_max," with step as ", Levels_step)) +
+          scale_y_continuous(breaks = ticks,
+                             limits = c(0, 1),
+                             expand = c(0, 0),
+                             labels = ylabels) +
+          theme_classic() +
+          theme(
+            text = element_text(size = 12),
+            axis.text.x = element_text(size = 12),
+            axis.text.y = element_text(size = 12)
+          ) 
+      })
+    }
 
     i = 100
     updateProgressBar(
@@ -955,11 +998,11 @@ server <- function(input, output, session) {
       }))
     
     ## 打印表格
-    gstudy.res_boot$gstudy.out <-
-      cbind(gstudy.res_boot$gstudy.out, gstudy.res.CI)
+    # gstudy.res_boot$gstudy.out <-
+    #   cbind(gstudy.res_boot$gstudy.out, gstudy.res.CI)
     
     output$recommModelGStudyBootResult <- renderPrint({
-      gstudy.res_boot$gstudy.out
+      cbind(gstudy.res_boot, gstudy.res.CI)
     })
     
     ## 可下载的表格
@@ -974,15 +1017,16 @@ server <- function(input, output, session) {
   
   observeEvent(input$runDstudyBootButton, {
     dstudy.res_boot <- dstudyResultBoot()
-    colnames(dstudy.res_boot$ds.df) <-
-      c("Source",
-        "Est.Variance",
-        "N",
-        "Est.(Var/N)",
-        "2.5%",
-        "97.5%")
+    # colnames(dstudy.res_boot$ds.df) <-
+    #   c("Source",
+    #     "Est.Variance",
+    #     "N",
+    #     "Est.(Var/N)",
+    #     "2.5%",
+    #     "97.5%")
     output$recommModelDStudyBootResult <- renderPrint({
-      print.dStudy(dstudy.res_boot)
+      dstudy.res_boot
+      # print.dStudy(dstudy.res_boot)
     })
     
     ## 可下载的表格

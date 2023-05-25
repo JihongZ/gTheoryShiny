@@ -117,3 +117,20 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
 
 resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
 print(resDat)
+
+
+
+# Test dstudy plot --------------------------------------------------------
+res <- lmer(Score ~ (1 | Person_ID) +  ( 1 | Item_ID) + (1 | Occasion), dat = dat)
+gstudy.res <- gstudy(res)
+
+data.frame(
+  Item_ID_seq = seq(from = 10, to = 100, by = 10)
+)  
+
+sapply(Item_ID_seq, \(x) dstudy(gstudy.res, n = data.frame("Item_ID" = x, "Occasion" = 20), unit = "Person_ID")[["gcoef"]])
+
+
+
+
+sapply(dat[c("Person_ID", "Item_ID")], n_distinct)
