@@ -233,14 +233,10 @@ ui <- dashboardPage(
                 downloadButton("downloadGstudyTheta", "Factor Score Table")
               ),
               conditionalPanel(
-                condition = "input.runGstudyButton >=1",
-                downloadButton("downloadGstudyResult", "Variance-Covariance Matrix")
-              ),
-              conditionalPanel(
                 condition = "input.runGstudyBootButton >=1",
                 downloadButton("downloadGstudyBootResult", "Bootstrapping Result")
               ),
-              ## 运行dstudy
+              #### Run dstudy -----
               hr(),
               checkboxInput("runDstudyBox", label = "Run Dstudy", FALSE),
               conditionalPanel(condition = "input.runDstudyBox == 1",
@@ -255,6 +251,7 @@ ui <- dashboardPage(
                              label = "Add facet levels"),
                 actionButton("runDstudyButton", "Run"),
                 actionButton("runDstudyBootButton", "Run bootstrapping"),
+                actionButton("plotDstudyCoef", "Plot Coefficients"),
                 progressBar(id = "dstudybar", 
                             value = 0,
                             total = 100,
@@ -273,6 +270,7 @@ ui <- dashboardPage(
               )
         ),
         box(title = "Result: ", width = 8,
+            #### Output UI for gstudy  ----
             conditionalPanel(
               condition = "input.runGstudyButton >= 1",
               h4("Gstudy Output："),
@@ -285,9 +283,9 @@ ui <- dashboardPage(
             conditionalPanel(
               condition = "input.runGstudyBootButton >= 1",
               h4("Estimate Bootstrapping SD for G-study："),
-              verbatimTextOutput("recommModelGStudyBootResult")
+              DTOutput("recommModelGStudyBootResult")
             ),
-            # Dstudy
+            #### Output UI for dstudy  ----
             conditionalPanel(condition = "input.confirmFacetLevel >= 1",
                              p("Sample Size for Dstudy:"),
                              DTOutput("updatedNDT")),
@@ -303,7 +301,13 @@ ui <- dashboardPage(
               h4("Estimate Bootstrapping SD for D-study："),
               verbatimTextOutput("recommModelDStudyBootResult")
             ),
-            plotOutput("DstudyCoefPlot")
+            # plot dstudy coefficient path plot
+            conditionalPanel(
+              condition = "input.plotDstudyCoef >= 1",
+              h4("Coefficient path plot for D-study："),
+              plotOutput("DstudyCoefPlot")
+            )
+            
         )
       ),
     )
@@ -319,11 +323,11 @@ server <- function(input, output, session) {
   # 上传数据
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
+  
   observeEvent(input$dataConfirm, {
     dat <<- datRaw()
-    observeEvent(input$transform, {
-      dat <<- datTrans()
-    })
+    observeEvent(input$transform, {dat <<- datTrans()})
+    
     updateActionButton(
       session,
       inputId = "dataConfirm",
@@ -432,39 +436,40 @@ server <- function(input, output, session) {
   ## Server for Page 2: Auto detect design of data ----------------------------------------------------
   ### Selection UI for user-selected facets / outcomes / ID ----------------------------------------
   
-  # 选择ID
-  output$selectedID <- renderUI({
-    selectInput(
-      "selectedID",
-      "1. ID variable:",
-      choices = colnames(dat),
-      selected = colnames(dat)[1]
-    )
-  })
-
-  # 选择outcome
-  output$selectedOutcome <- renderUI({
-    selectInput(
-      "selectedOutcome",
-      "2. Outcome variable:",
-      choices = setdiff(colnames(dat), input$selectedID),
-      selected = setdiff(colnames(dat), input$selectedID)[1]
-    )
-  })
-
-  # 选择facet
-  output$selectedMultipleFacets <- renderUI({
-    selectInput(
-      "selectedMultipleFacets",
-      "3. Facet(s):",
-      choices = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
-      selected = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
-      multiple = TRUE
-    )
-  })
-
-  # 选择covariates
-  output$selectedCovariates <- renderUI({
+  observeEvent(input$dataConfirm, {
+    # 选择ID
+    output$selectedID <- renderUI({
+      selectInput(
+        "selectedID",
+        "1. ID variable:",
+        choices = colnames(dat),
+        selected = colnames(dat)[1]
+      )
+    })
+    
+    # 选择outcome
+    output$selectedOutcome <- renderUI({
+      selectInput(
+        "selectedOutcome",
+        "2. Outcome variable:",
+        choices = setdiff(colnames(dat), input$selectedID),
+        selected = setdiff(colnames(dat), input$selectedID)[1]
+      )
+    })
+    
+    # 选择facet
+    output$selectedMultipleFacets <- renderUI({
+      selectInput(
+        "selectedMultipleFacets",
+        "3. Facet(s):",
+        choices = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
+        selected = setdiff(colnames(dat), c(input$selectedID, input$selectedOutcome)),
+        multiple = TRUE
+      )
+    })
+    
+    # 选择covariates
+    output$selectedCovariates <- renderUI({
       checkboxGroupInput(
         "selectedCovariates",
         "(Optional) Select covariate(s):",
@@ -472,23 +477,25 @@ server <- function(input, output, session) {
         selected = NULL
       )
     })
-  
-  # 选择是否要进行mGtheory
-  output$mGtheory <- renderUI({
-    checkboxInput(inputId = "mGtheory", 
-                  label = strong("(Optional) mGtheory"),
-                  value = FALSE, width = "400px")
+    
+    # 选择是否要进行mGtheory
+    output$mGtheory <- renderUI({
+      checkboxInput(inputId = "mGtheory", 
+                    label = strong("(Optional) mGtheory"),
+                    value = FALSE, width = "400px")
+    })
+    
+    # mgTheory选择fixed facet
+    output$selectedFixedFacet <- renderUI({
+      selectInput(
+        "selectedFixedFacet",
+        "5. Select fixed facet:",
+        choices = selectedFacet(),
+        selected = selectedFacet()[1]
+      )
+    })
   })
   
-  # mgTheory选择fixed facet
-  output$selectedFixedFacet <- renderUI({
-    selectInput(
-      "selectedFixedFacet",
-      "5. Select fixed facet:",
-      choices = selectedFacet(),
-      selected = selectedFacet()[1]
-    )
-  })
 
   ## missing data server
   observeEvent(input$variableSettingConfirm, {
@@ -609,13 +616,13 @@ server <- function(input, output, session) {
      }
    })
 
-   ### Present simplifed fomular text ----------------------------------------
+   ### Output simplified fomular text ----------------------------------------
    output$recommFormular <- renderText({
      makeeasyformular(gtheoryFormula())
      #gtheoryFormula()
    })
 
-   ### Present data design table and sample size for each level of facet ----------------------------------------
+   ### Output data design table ----------------------------------------
    observeEvent(input$variableSettingConfirm, {
      # 表格打印： facet嵌套
      output$nestedStrucTable <- renderDT({
@@ -632,408 +639,392 @@ server <- function(input, output, session) {
      })
    })
 
-   ## Running recommended model ------------------------------------------------------------------
-   #------------#
-   # 分支1: 若為univariate gstudy，運行lmer
-   # 分支2: 若為multivariate gstudy，運行lmmTMB::glmmTMB
-   #------------#
+  ## Run recommended model ------------------------------------------------------------------
+  #------------#
+  # 分支1: 若為univariate gstudy，運行lmer
+  # 分支2: 若為multivariate gstudy，運行lmmTMB::glmmTMB
+  #------------#
 
-   ### Run gstudy  ----------------------------------------
-   gstudyResult <- eventReactive(input$runGstudyButton, {
-     nFacet <- NULL
-     datG <- dat # data used for gstudy
-     ## make sure outcome as numeric and facet as factors
-     datG[[selectedOutcome()]] <- as.numeric(datG[[selectedOutcome()]])
-     datG[c(input$selectedID, selectedFacet())] <- lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
-
-     if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
-       if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
-         formulaRecomm <- as.formula(gtheoryFormula())
-         lmmFit <- lmer(data = datG, formula = formulaRecomm)
-       } else{ # 分支1.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
-         lmmFit <- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
-       }
-       ## Random effects
-       randomEffectEstimate <- ranef(lmmFit)
-       randomEffectLevel <- sapply(lapply(datG[selectedFacet()], unique), length)
-       allRandomFacets <<- unlist(randomEffectLevel[selectedFacet()])
-       list(
-         lmmFit = lmmFit,
-         fixedEffect = fixef(lmmFit),
-         VarComp = gstudy(lmmFit)$gstudy.out
-       )
-       
-     }else{# 分支2: 若為multivariate gstudy
-       if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
-         formulaTxt <- gtheoryFormula()
-         formulaRecomm <- as.formula(formulaTxt)
-         lmmFit <<- glmmTMB::glmmTMB(
-           data = datG,
-           formula = formulaRecomm,
-           family = gaussian,
-           dispformula = ~0
-         )
-         ## extract residual var-cov matrix
-         residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
-                                   datG[c(unit(), selectedFacet())]) %>%
-           pivot_wider(names_from = selectedFixedFacet(), values_from = residuals, names_prefix = "facet") %>%
-           ungroup()
-         residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
-
-         ## run second time
-         dat2 = datG
-         dat2$Residual = residuals(lmmFit, "response")
-         formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
-         formulaRecommWtResid <- as.formula(formulaWtResidTxt)
-         lmmFit <<- glmmTMB::glmmTMB(
-           formula = formulaRecommWtResid,
-           data =  dat2,
-           family = gaussian,
-           dispformula =~0
-         )
-         
-
-         res <- lme4::VarCorr(lmmFit)
-         resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
-         
-         list(
-           lmmFit = lmmFit,
-           fixedEffect = fixef(lmmFit),
-           VarComp = resDat
-         )
-         
-       } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
-         shinyjs::alert("This function is currently not available!")
-       }
-     }
-   })
-   
-    ## with Bootstrapping
-    gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
-      datGBoot <- dat
-      datGBoot[[selectedOutcome()]] <- as.numeric(datGBoot[[selectedOutcome()]])
-      datGBoot[c(input$selectedID, selectedFacet())] <- lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
+  ### Run gstudy  ----------------------------------------
+  ###### --- 
+  # Return a list with three elements:
+  # lmmFit: lme4 object
+  # fixedEffect: vector; fixed effect
+  # VarComp: matrix; variance-covariance matrix
+  # gstudy: gstudy Class
+  ###### ---
+  gstudyResult <- eventReactive(input$runGstudyButton, {
+    nFacet <- NULL
+    datG <- dat # data used for gstudy
+    ## make sure outcome as numeric and facet as factors
+    datG[[selectedOutcome()]] <- as.numeric(datG[[selectedOutcome()]])
+    datG[c(input$selectedID, selectedFacet())] <- lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
+    
+    if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
+      if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
+        formulaRecomm <- as.formula(gtheoryFormula())
+        lmmFit <- lmer(data = datG, formula = formulaRecomm)
+      } else{ # 分支1.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
+        lmmFit <- lmer(data = datG, formula = as.formula(makehardformular(input$selfFormular)))
+      }
+      ## Random effects
+      randomEffectEstimate <- ranef(lmmFit)
+      randomEffectLevel <- sapply(lapply(datG[selectedFacet()], unique), length)
+      allRandomFacets <<- unlist(randomEffectLevel[selectedFacet()])
+      list(
+        lmmFit = lmmFit,
+        fixedEffect = fixef(lmmFit),
+        VarComp = gstudy(lmmFit)$gstudy.out,
+        gstudy = gstudy(lmmFit)
+      )
       
-      boot.gstudy <-
-        lme4::bootMer(
-          gstudyResult()$lmmFit,
-          gstudy.forboot,
-          nsim = input$nboot,
-          use.u = FALSE,
-          type = "parametric",
-          parallel = "snow",
-          ncpus = 2
+    }else{# 分支2: 若為multivariate gstudy
+      if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
+        formulaTxt <- gtheoryFormula()
+        formulaRecomm <- as.formula(formulaTxt)
+        lmmFit <<- glmmTMB::glmmTMB(
+          data = datG,
+          formula = formulaRecomm,
+          family = gaussian,
+          dispformula = ~0
         )
-      
-      boot.gstudy
-      # cbind(gstudyResult()$VarComp, t(boot.gstudy$t))
-      # t(boot.gstudy$t)
-      # boot.gstudy
-    })
-   ### Run dstudy ----------------------------------------
-   #### Facet Selection UI for dstudy ----------------------------------------
-   #------------#
-   # 当选好facet按下confirm按钮时，Read in default Facets levels in gstudy (defaultN)
-   #------------#
-   observeEvent(input$variableSettingConfirm, {
-     defaultN <<- sapply(dat[selectedFacet()], n_distinct)
-     updatedN <<- defaultN
-   })
-
-   selectedFacetValue <- reactive({input$FacetValueSlider})
-   selectedFacetForDstudy <- reactive({input$FacetDStudySelector})
-
-   observeEvent(input$runDstudyBox, {
-     #### Output UI for facet and levels selection  ----------------------------------------
-     ## ----------------------------- ##
-     ## 当按下确认Facet Level键
-     ## ----------------------------- ##
-     observeEvent(input$confirmFacetLevel, {
-       updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
-       output$updatedNDT <- renderDT({
-         data.frame(New = updatedN, old = defaultN)
-       })
-     })
-
-     #------------#
-     # Select which facet to add sample size
-     #------------#
-     output$selectedFacetMenu <- renderUI({
-       selectInput(inputId = "FacetDStudySelector",
-                   label = "Select facet:",
-                   choices = selectedFacet(),
-                   multiple = FALSE)
-     })
-
-     #------------#
-     # Ongoing: Select levels for target facet
-     #------------#
-     observeEvent(input$FacetDStudySelector, {
-       ###### ---
-       # Facet levels slider for selected Facet
-       ###### ---
-        output$selectedFacetLevels <- renderUI({
-         numericInput(
-           inputId = "FacetValueSlider",
-           label = "Enter target level: ",
-           value = defaultN[selectedFacetForDstudy()],
-           min = 0,
-           max = defaultN[selectedFacetForDstudy()] * 10,
-           step = 10
-         )
-       })
-
-       ###### ---
-       # Facet levels range for dstudy plot
-       ###### ---
-       output$selectedMultipleFacetLevels <- renderUI({
-         textInput(
-           inputId = "FacetValueRange",
-           label = "(Optional) Enter level's range: ",
-           value = "",
-           placeholder = "For example, 100:200:10 represents from 100 to 200 with step 10"
-         )
-       })
-
-     })
-   })
-
-   dstudyResult <- eventReactive(input$runDstudyButton, {
-     datD <- dat
-     datD[[selectedOutcome()]] <- as.numeric(datD[[selectedOutcome()]])
-     datD[c(input$selectedID, selectedFacet())] <- lapply(datD[c(input$selectedID, selectedFacet())], as.factor)
-
-     if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
-       if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
-         gstudy.res <- gstudy(lmmFit)
-       } else{ # 分支1.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
-         gstudy.res <- gstudy(lmmFit)
-       }
-       dstudy(x = gstudy.res, n = updatedN, unit = unit())
-     }else{# 分支2: 若為multivariate gstudy
-       if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
-         gstudy.res <- gstudy(lmmFit)
-         dstudy(x = gstudy.res, n = updatedN, unit = unit())
-       } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
-         gstudy.res <- gstudy(lmmFit)
-         dstudy(x = gstudy.res, n = updatedN, unit = unit())
-       }
-     }
-
-   })
-
-   # dstudyResultBoot
-   dstudyResultBoot <- eventReactive(input$runDstudyBootButton, {
-     datDBoot <- dat
-     datDBoot[[selectedOutcome()]] <- as.numeric(datDBoot[[selectedOutcome()]])
-     datDBoot[c(input$selectedID, selectedFacet())] <- lapply(datDBoot[c(input$selectedID, selectedFacet())], as.factor)
-
-     # gstudy.res <- gstudy(lmmFit)
-     boot.gstudy.res <- gstudyResultBoot()
-     dstudy.res_boot <- dstudyResult() # placeholder
-
-     boot.dstudy.res <- NULL
-     for (i in 1:input$nboot) {
-       temp <- gstudy(lmmFit)
-       temp.dstudy <- dstudy(temp, allRandomFacets, unit = unit())
-
-       boot.dstudy.res <- rbind(
-         boot.dstudy.res,
-         c(temp.dstudy$ds.df[, 4],
-           temp.dstudy$relvar,
-           temp.dstudy$absvar,
-           temp.dstudy$gcoef,
-           temp.dstudy$dcoef
-         )
-       )
-     }
-
-     dstudy.res.CI <- t(apply(t(boot.dstudy.res), 1, function(x) {quantile(x, probs = c(.025, .975))}))
-     names(dstudy.res.CI) <- c("2.5%", "97.5%")
-
-     # beautify output
-     dstudy.res_boot$dcoef[2] <-
-       dstudy.res.CI[nrow(dstudy.res.CI), 1]
-     dstudy.res_boot$dcoef[3] <-
-       dstudy.res.CI[nrow(dstudy.res.CI), 2]
-     names(dstudy.res_boot$dcoef) <- c("Est", "2.5%", "97.5%")
-
-     dstudy.res_boot$gcoef[2] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 1, 1]
-     dstudy.res_boot$gcoef[3] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 1, 2]
-     names(dstudy.res_boot$gcoef) <- c("Est", "2.5%", "97.5%")
-
-     dstudy.res_boot$absvar[2] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 2, 1]
-     dstudy.res_boot$absvar[3] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 2, 2]
-     names(dstudy.res_boot$absvar) <- c("Est", "2.5%", "97.5%")
-
-     dstudy.res_boot$relvar[2] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 3, 1]
-     dstudy.res_boot$relvar[3] <-
-       dstudy.res.CI[nrow(dstudy.res.CI) - 3, 2]
-     names(dstudy.res_boot$relvar) <- c("Est", "2.5%", "97.5%")
-     dstudy.res_boot$ds.df <-
-       cbind(dstudy.res_boot$ds.df, dstudy.res.CI[1:(-4 + nrow(dstudy.res.CI)),])
-
-     # output
-     dstudy.res_boot
-   })
-   
-   
-  ## Present results of gstudy  ----------------------------------------
+        ## extract residual var-cov matrix
+        residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
+                                  datG[c(unit(), selectedFacet())]) %>%
+          pivot_wider(names_from = selectedFixedFacet(), values_from = residuals, names_prefix = "facet") %>%
+          ungroup()
+        residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
+        
+        ## run second time
+        dat2 = datG
+        dat2$Residual = residuals(lmmFit, "response")
+        formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
+        formulaRecommWtResid <- as.formula(formulaWtResidTxt)
+        lmmFit <- glmmTMB::glmmTMB(
+          formula = formulaRecommWtResid,
+          data =  dat2,
+          family = gaussian,
+          dispformula =~0
+        )
+        
+        
+        res <- lme4::VarCorr(lmmFit)
+        resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
+        
+        list(
+          lmmFit = lmmFit,
+          fixedEffect = fixef(lmmFit),
+          VarComp = resDat,
+          mgstudy = NULL # retrun a mgstudy class
+        )
+        
+      } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
+        shinyjs::alert("This function is currently not available!")
+      }
+    }
+  })     
+  
+  ### Run gstudy bootstrapping ----------------------------------------
+  ###### --- 
+  # return bootMer object
+  ###### ---
+  gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
+    datGBoot <- dat
+    datGBoot[[selectedOutcome()]] <- as.numeric(datGBoot[[selectedOutcome()]])
+    datGBoot[c(input$selectedID, selectedFacet())] <- lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
+    
+    boot.gstudy <-
+      lme4::bootMer(
+        gstudyResult()$lmmFit,
+        gstudy.forboot,
+        nsim = input$nboot,
+        use.u = FALSE,
+        type = "parametric",
+        parallel = "snow",
+        ncpus = 2
+      )
+    
+    boot.gstudy
+  })
+  
+  ### Run gstudy bootstrapping CI ----------------------------------------
+  ###### --- 
+  # Return data frame of gstudy variance components with bootstrapping CI
+  ###### ---
+  gstudyResultBootCI <- eventReactive(input$runGstudyBootButton, {
+    gstudy_res <- gstudyResult()$VarComp # Variance-covariance
+    boot_gstudy_res <- gstudyResultBoot() # bootMer object
+    
+    # calculate bootstrap CI
+    bootCI_gstudy_res <-
+      t(apply(boot_gstudy_res$t, 2, function(x) {quantile(x, probs = c(.025, .975))}))
+    
+    as.data.frame(cbind(gstudy_res, bootCI_gstudy_res))
+  })
+  
+  ### Output gstudy results and bootstrapping  ----------------------------------------
   output$recommModelFixedEffectResult <- renderPrint({gstudyResult()$fixedEffect})
   output$GstudyResultPrint <- renderDT({gstudyResult()$VarComp})
-  ### Download buttons for gstudy ----------------------------------------
-  output$downloadGstudyResult <- downloadHandler(
-    filename = "gstudyResult.csv",
-    content = function(file) {
-      write.csv(gstudyResult()$gstudy.out, file, row.names = FALSE)
-    }
-  )
-  ## 可下载的表格 downloadGstudyTheta
+  output$recommModelGStudyBootResult <- renderDT({gstudyResultBootCI()})
+  
+  ### buttons: gstudy results download  ----------------------------------------
+  ###### --- 
+  # downloadGstudyTheta: button for download theta scores
+  # downloadGstudyBootResult: button for download bootstrapping results
+  ###### ---
   output$downloadGstudyTheta <- downloadHandler(
     filename = "thetaEstimates.csv",
-    content = function(file) {
-      write.csv(extractTheta(gstudyResult()$lmmFit), file, row.names = FALSE)
-    }
+    content = \(file) {write.csv(extractTheta(gstudyResult()$lmmFit), file, row.names = FALSE)}
   )
   
+  output$downloadGstudyBootResult <- downloadHandler(
+    filename = paste0("gstudyBootstrapN", input$nboot, ".csv"),
+    content = \(file) {write.csv(gstudyResultBootCI(), file, row.names = FALSE)}
+  )
+  
+  ###  UI for dstudy ----------------------------------------
+  #### Output UI for facet and levels selection  ----------------------------------------
+  observeEvent(input$runDstudyBox, {
+    ## ----------------------------- ##
+    ## 当按下确认Facet Level键
+    ## ----------------------------- ##
+    observeEvent(input$confirmFacetLevel, {
+      updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
+      output$updatedNDT <- renderDT({
+        data.frame(New = updatedN, old = defaultN)
+      })
+    })
+    
+    #------------#
+    # Select which facet to add sample size
+    #------------#
+    output$selectedFacetMenu <- renderUI({
+      selectInput(inputId = "FacetDStudySelector",
+                  label = "Select facet:",
+                  choices = selectedFacet(),
+                  multiple = FALSE)
+    })
+    
+    #------------#
+    # Ongoing: Select levels for target facet
+    #------------#
+    observeEvent(input$FacetDStudySelector, {
+      ###### ---
+      # Facet levels slider for selected Facet
+      ###### ---
+      output$selectedFacetLevels <- renderUI({
+        numericInput(
+          inputId = "FacetValueSlider",
+          label = "Enter target level: ",
+          value = defaultN[selectedFacetForDstudy()],
+          min = 0,
+          max = defaultN[selectedFacetForDstudy()] * 10,
+          step = 10
+        )
+      })
+      
+      ###### ---
+      # Facet levels range for dstudy plot
+      ###### ---
+      output$selectedMultipleFacetLevels <- renderUI({
+        textInput(
+          inputId = "FacetValueRange",
+          label = "(Optional) Enter level's range: ",
+          value = "",
+          placeholder = "For example, 100:200:10 represents from 100 to 200 with step 10"
+        )
+      })
+      
+    })
+  })
+  
+  #### button: confirm the facet levels  ----------------------------------------
+  #------------#
+  # 当选好facet按下confirm按钮时，Read in default Facets levels in gstudy (defaultN)
+  #------------#
+  observeEvent(input$variableSettingConfirm, {
+    defaultN <<- sapply(dat[selectedFacet()], n_distinct)
+    updatedN <<- defaultN
+  })
+  
+  ###### --- 
+  # selectedFacetValue: Levels for certain facet
+  # selectedFacetForDstudy: Facet drop-down selector for certain facet
+  ###### ---
+  selectedFacetValue <- reactive({input$FacetValueSlider})
+  selectedFacetForDstudy <- reactive({input$FacetDStudySelector})
+  
+  ### Run dstudy ----------------------------------------
+  ###### --- 
+  # Return a dStudy-class object, which is a list containing 5 elements:
+  # 1. ds.df: a dataframe with varaince components
+  # 2. relvar: relative error variance
+  # 3. absvar: absolute error variance
+  # 4. gcoef: generalizability coefficient
+  # 5. dcoef: generalizability coefficient
+  ###### ---
+  dstudyResult <- eventReactive(input$runDstudyButton, {
+    datD <- dat
+    datD[[selectedOutcome()]] <- as.numeric(datD[[selectedOutcome()]])
+    datD[c(input$selectedID, selectedFacet())] <- lapply(datD[c(input$selectedID, selectedFacet())], as.factor)
+    
+    
+    if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
+      ## gstudy results
+      gstudy_res <- gstudyResult()$gstudy
+      dstudy_res = dstudy(x = gstudy_res, n = updatedN, unit = unit())
+    }else{# 分支2: 若為multivariate gstudy,运行mdstudy
+      mgstudy_res <- gstudyResult()$mgstudy
+      dstudy_res = mdstudy(x = mgstudy_res, n = updatedN, unit = unit())
+    }
+    
+    dstudy_res
+  })
+  
+  ### Run dstudy bootstrapping  ----------------------------------------
+  ###### --- 
+  # return bootstrapping iterations
+  ###### ---
+  dstudyResultBoot <- eventReactive(input$runDstudyBootButton, {
+    datDBoot <- dat
+    datDBoot[[selectedOutcome()]] <- as.numeric(datDBoot[[selectedOutcome()]])
+    datDBoot[c(input$selectedID, selectedFacet())] <- lapply(datDBoot[c(input$selectedID, selectedFacet())], as.factor)
+    
+    boot_dstudy <- NULL # for bootstrapping iterations
+    gstudy_res <- gstudyResult()$gstudy
+    boot_gstudy_res <- gstudyResultBoot()
+    bootCI_gstudy_res <- gstudyResultBootCI()
+    
+    for (i in 1:input$nboot) {
+      gstudy_res$gstudy.out[, 2] <- t(boot_gstudy_res$t)[, i]
+      temp.dstudy <- dstudy.forboot(x = gstudy_res, n = updatedN, unit = unit())
+      
+      boot_dstudy <- rbind(
+        boot_dstudy,
+        c(temp.dstudy$ds.df[, 4],
+          temp.dstudy$relvar,
+          temp.dstudy$absvar,
+          temp.dstudy$gcoef,
+          temp.dstudy$dcoef
+        )
+      )
+    }
+    boot_dstudy # nboot X (vcov.n + var + coef)
+  })
+  
+  ### Run dstudy bootstrapping CI ----------------------------------------
+  dstudyResultBootCI <- eventReactive(input$runDstudyBootButton, {
+    
+    dstudy_res_boot <- dstudyResult() # placeholder
+    
+    dstudy.res.CI <- t(apply(dstudyResultBoot(), 2, \(x) {quantile(x, probs = c(.025, .975))} ))
+    names(dstudy.res.CI) <- c("2.5%", "97.5%")
+    
+    # beautify output
+    dstudy_res_boot$dcoef[2] <- dstudy.res.CI[nrow(dstudy.res.CI), 1]
+    dstudy_res_boot$dcoef[3] <- dstudy.res.CI[nrow(dstudy.res.CI), 2]
+    names(dstudy_res_boot$dcoef) <- c("Est", "2.5%", "97.5%")
+    
+    dstudy_res_boot$gcoef[2] <- dstudy.res.CI[nrow(dstudy.res.CI) - 1, 1]
+    dstudy_res_boot$gcoef[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 1, 2]
+    names(dstudy_res_boot$gcoef) <- c("Est", "2.5%", "97.5%")
+    
+    dstudy_res_boot$absvar[2] <- dstudy.res.CI[nrow(dstudy.res.CI) - 2, 1]
+    dstudy_res_boot$absvar[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 2, 2]
+    names(dstudy_res_boot$absvar) <- c("Est", "2.5%", "97.5%")
+    
+    dstudy_res_boot$relvar[2] <- dstudy.res.CI[nrow(dstudy.res.CI) - 3, 1]
+    dstudy_res_boot$relvar[3] <- dstudy.res.CI[nrow(dstudy.res.CI) - 3, 2]
+    names(dstudy_res_boot$relvar) <- c("Est", "2.5%", "97.5%")
+    
+    dstudy_res_boot$ds.df <-
+      cbind(dstudy_res_boot$ds.df, dstudy.res.CI[1:(-4 + nrow(dstudy.res.CI)), ])
+    
+    # output
+    dstudy_res_boot
+  })
 
-   ## Present results of dstudy ----------------------------------------
-   observeEvent(input$runDstudyButton, {
-     i = 0
-
-     dstudy.out <- dstudyResult()
-     output$recommModelDStudyResult <- renderPrint({
-       print.dStudy(dstudy.out)
-     })
-
-     ### g coefficient path plot across sample size -----
-     facetLevels = reactive({input$FacetValueRange})
-     if (facetLevels() != "") {
-       updatedNrange = updatedN ## assign N for dstudy to updatedNrange
-       facetLevelsRange <- reactive({input$FacetValueRange})
-       parms = as.numeric(str_split(facetLevelsRange(), ":")[[1]]) # parameters for generate levels
-       Levels_min = parms[1]
-       Levels_max = parms[2]
-       Levels_step = parms[3]
-       facetLevels = seq(from = Levels_min, to = Levels_max, step = Levels_step)
-       gcoefs = rep(NA, length(facetLevels))
-       dcoefs = rep(NA, length(facetLevels))
-       # loop over each level
-       for (i in 1:length(facetLevels)) {
-         updatedNrange[selectedFacetForDstudy()] = facetLevels[i]
-         gstudy.res <- gstudy(lmmFit)
-         dstudy.res <- dstudy(x = gstudy.res, n = updatedNrange, unit = unit())
-         gcoefs[i] <- dstudy.res[["gcoef"]]
-         dcoefs[i] <- dstudy.res[["dcoef"]]
-       }
-       ###### ---
-       # rho: generalizability coefficient
-       # Phi: phi coefficient or an index of dependability.
-       ###### ---
-       DstudyCoefData = data.frame(N = facetLevels, rho = gcoefs, Phi = dcoefs)
-       # browser()
-       output$DstudyCoefPlot <- renderPlot({
-         ticks = seq(0, 1, 0.02)
-         labels_point = seq(0, 1, 0.1)
-         ylabels = rep("", length(ticks))
-         for (i in seq(ticks)) {
-           if (as.character(ticks[i]) %in% as.character(labels_point)) {
-             ylabels[i] = ticks[i]
-           }
-         }
-         ggplot(DstudyCoefData) +
-           geom_line(aes(x = N, y = rho), alpha = 0.4) +
-           geom_text(aes(x = N, y = rho), label = "rho", parse = TRUE, size = 5) +
-           geom_line(aes(x = N, y = Phi), alpha = 0.4) +
-           geom_text(aes(x = N, y = Phi), label = "Phi", parse = TRUE, size = 5) +
-           labs(x = "Sample Size", y = "Coefficient",
-                title = paste0(selectedFacetForDstudy(),": from ", Levels_min," to ", Levels_max," with step as ", Levels_step)) +
-           scale_y_continuous(breaks = ticks,
-                              limits = c(0, 1),
-                              expand = c(0, 0),
-                              labels = ylabels) +
-           theme_classic() +
-           theme(
-             text = element_text(size = 12),
-             axis.text.x = element_text(size = 12),
-             axis.text.y = element_text(size = 12)
-           )
-       })
-     }
-
-     i = 100
-     updateProgressBar(
-       id = "dstudybar",
-       status = "success",
-       value = i,
-       total = 100,
-       title = paste0("Process ", i, "%")
-     )
-
-     ## 可下载的表格 downloadDstudyResult
-     colnames(dstudy.out$ds.df) <-c("Source", "Est.Variance", "N", "Est.(Var/N)")
-     output$downloadDstudyResult <- downloadHandler(
-       filename = "dstudyResult.csv",
-       content = function(file) {write.csv(dstudy.out$ds.df, file, row.names = FALSE)}
-     )
-   })
-
-   ## Present Gstudy bootstrapping results ----------------------------------------
-   observeEvent(input$runGstudyBootButton, {
-     gstudy.res_boot <- gstudyResult() # place holder
-     boot.gstudy.res <- gstudyResultBoot()
-     # calculate bootstrap CI
-     gstudy.res.CI <-
-       t(apply(t(boot.gstudy.res()$t), 1, function(x) {
-         quantile(x, probs = c(.025, .975))
-       }))
-
-     ## 打印表格
-     # gstudy.res_boot$gstudy.out <-
-     #   cbind(gstudy.res_boot$gstudy.out, gstudy.res.CI)
-
-     output$recommModelGStudyBootResult <- renderPrint({
-       cbind(gstudy.res_boot, gstudy.res.CI)
-     })
-
-     ## 可下载的表格
-     output$downloadGstudyBootResult <- downloadHandler(
-       filename = paste0("gstudyBootstrapN", input$nboot, "Result.csv"),
-       content = function(file) {
-         write.csv(gstudy.res_boot$gstudy.out, file, row.names = FALSE)
-       }
-     )
-
-   })
-
-   observeEvent(input$runDstudyBootButton, {
-     dstudy.res_boot <- dstudyResultBoot()
-     # colnames(dstudy.res_boot$ds.df) <-
-     #   c("Source",
-     #     "Est.Variance",
-     #     "N",
-     #     "Est.(Var/N)",
-     #     "2.5%",
-     #     "97.5%")
-     output$recommModelDStudyBootResult <- renderPrint({
-       dstudy.res_boot
-       # print.dStudy(dstudy.res_boot)
-     })
-
-     ## 可下载的表格
-     output$downloadDstudyBootResult <- downloadHandler(
-       filename = paste0("dstudyBootstrapN", input$nboot, "Result.csv"),
-       content = function(file) {
-         write.csv(dstudy.res_boot$ds.df, file, row.names = FALSE)
-       }
-     )
-
-   })
+  
+  ### Output dstudy results and bootstrapping  ----------------------------------------
+  output$recommModelDStudyResult <- renderPrint({print.dStudy(dstudyResult())})
+  output$recommModelDStudyBootResult <- renderPrint({dstudyResultBootCI()})
+  
+  ### Output path plot of dstudy ----------------------------------------
+  facetLevelsRange <- reactive({input$FacetValueRange})
+  
+  observeEvent(input$plotDstudyCoef, {
+    gstudy_res <- gstudyResult()$gstudy
+    
+    ###### --- 
+    # g coefficient path plot across sample size
+    ###### ---
+    if (facetLevelsRange() != "") {
+      updatedNrange = updatedN ## assign N for dstudy to updatedNrange
+      parms = as.numeric(str_split(facetLevelsRange(), ":")[[1]]) # parameters for generate levels
+      Levels_min = parms[1]
+      Levels_max = parms[2]
+      Levels_step = parms[3]
+      facetLevels = seq(from = Levels_min, to = Levels_max, by = Levels_step)
+      gcoefs = rep(NA, length(facetLevels))
+      dcoefs = rep(NA, length(facetLevels))
+      
+      # loop over each level
+      for (i in 1:length(facetLevels)) {
+        updatedNrange[selectedFacetForDstudy()] = facetLevels[i]
+        dstudy.res <- dstudy(x = gstudy_res, n = updatedNrange, unit = unit())
+        gcoefs[i] <- dstudy.res[["gcoef"]]
+        dcoefs[i] <- dstudy.res[["dcoef"]]
+      }
+      ###### ---
+      # rho: generalizability coefficient
+      # Phi: phi coefficient or an index of dependability.
+      ###### ---
+      DstudyCoefData = data.frame(N = facetLevels, rho = gcoefs, Phi = dcoefs)
+      
+      output$DstudyCoefPlot <- renderPlot({
+        ticks = seq(0, 1, 0.02)
+        labels_point = seq(0, 1, 0.1)
+        ylabels = rep("", length(ticks))
+        for (i in seq(ticks)) {
+          if (as.character(ticks[i]) %in% as.character(labels_point)) {
+            ylabels[i] = ticks[i]
+          }
+        }
+        ggplot(DstudyCoefData) +
+          geom_line(aes(x = N, y = rho), alpha = 0.4) +
+          geom_text(aes(x = N, y = rho), label = "rho", parse = TRUE, size = 5) +
+          geom_line(aes(x = N, y = Phi), alpha = 0.4) +
+          geom_text(aes(x = N, y = Phi), label = "Phi", parse = TRUE, size = 5) +
+          labs(x = "Sample Size", y = "Coefficient",
+               title = paste0(selectedFacetForDstudy(),": from ", Levels_min," to ", Levels_max," with step as ", Levels_step)) +
+          scale_y_continuous(breaks = ticks,
+                             limits = c(0, 1),
+                             expand = c(0, 0),
+                             labels = ylabels) +
+          theme_classic() +
+          theme(
+            text = element_text(size = 12),
+            axis.text.x = element_text(size = 12),
+            axis.text.y = element_text(size = 12)
+          )
+      })
+      
+    }
+    
+  })   
+  
+  ### button: dstudy results downloads  ----------------------------------------
+  ## dstudy results
+  output$downloadDstudyResult <- downloadHandler(
+    filename = "dstudyResult.csv",
+    content = \(file) {write.csv(dstudyResult()$ds.df, file, row.names = FALSE)}
+  )
+  ## dstudy results bootstrapping
+  output$downloadDstudyBootResult <- downloadHandler(
+    filename = paste0("dstudyBootstrapN", input$nboot, "Result.csv"),
+    content = \(file) {write.csv(dstudyResultBootCI()$ds.df, file, row.names = FALSE)}
+  )
+  
 
 }
 

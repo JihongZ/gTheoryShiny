@@ -1,6 +1,7 @@
 library(tidyverse)
 library(MASS)
 set.seed(20230212)
+source("advGtheoryFunctions.R")
 
 n_Person = 50
 n_Item = 20
@@ -41,96 +42,110 @@ dat <- conditions %>%
   mutate(
     Person_ID = factor(Person_ID, levels = 1:n_Person),
     Item_ID = factor(Item_ID, levels = 1:n_Item),
-    Occasion = factor(Occasion, levels = 1:n_Facet)) |> 
-  select(-case)
+    Occasion = factor(Occasion, levels = 1:n_Facet))
 
 glimpse(dat)
 # write.csv(dat, "data/mGtheoryData.csv", row.names = FALSE)
-write.csv(dat, "data/mGtheoryDataShort.csv", row.names = FALSE)
+# write.csv(dat, "data/mGtheoryDataShort.csv", row.names = FALSE)
 library(glmmTMB)
 library(lme4)
 
 # first run ---------------------------------------------------------------
-m2_mGT <- as.formula("Score ~ us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) ")
-m2_mGT_fit <- glmmTMB::glmmTMB(m2_mGT, dat, family = gaussian, dispformula =~0)
-m2_mGT_fit
-lme4::VarCorr(m2_mGT_fit)
-
-## extract residual var-cov matrix
-residuals_Person <- cbind(residuals = residuals(m2_mGT_fit, "response"), 
-                          dat[c("Person_ID", "Item_ID", "Occasion")]) %>% 
-  pivot_wider(names_from = Occasion, values_from = residuals, names_prefix = "facet") %>% 
-  ungroup()
-
-residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
-residual_cor
-
-# second run  -------------------------------------------------------------
-dat2 = dat
-dat2$Residual = residuals(m2_mGT_fit, "response")
-glimpse(dat2)
-m2_mGT2 <- as.formula("Score ~ 0 + us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) + diag(Occasion + 0 | Residual)")
-m2_mGT_fit2 <- glmmTMB::glmmTMB(m2_mGT2, dat2, family = gaussian, dispformula = ~0)
-m2_mGT_fit2
-res <- lme4::VarCorr(m2_mGT_fit2)
-res
-
-extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
-                                     order = c("cov.last", "lower.tri"), residCor) 
-{
-  order <- match.arg(order)
-  tmpf <- function(v, grp) {
-    lt.v <- lower.tri(v, diag = FALSE)
-    # vcov <- c(diag(v), v[lt.v <- lower.tri(v, diag = FALSE)])
-    sdcor <- c(attr(v, "stddev"), attr(v, "correlation")[lt.v])
-    nm <- rownames(v)
-    n <- nrow(v)
-    dd <- data.frame(grp = grp, 
-                     var1 = nm[c(seq(n), col(v)[lt.v])], 
-                     var2 = c(rep(NA, n), nm[row(v)[lt.v]]), 
-                     sdcor, 
-                     stringsAsFactors = FALSE)
-    if (order == "lower.tri") {
-      m <- matrix(NA, n, n)
-      diag(m) <- seq(n)
-      m[lower.tri(m)] <- (n + 1):(n * (n + 1)/2)
-      dd <- dd[m[lower.tri(m, diag = TRUE)], ]
-    }
-    dd
-  }
-  r <- do.call(rbind, c(mapply(tmpf, x, names(x), SIMPLIFY = FALSE), 
-                        deparse.level = 0))
-  if (attr(x, "useSc")) {
-    ss <- attr(x, "sc")
-    r <- rbind(r, data.frame(grp = "Residual", var1 = NA, 
-                             var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
-  }
-  rownames(r) <- NULL
-  r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+if (0) {
   
-  ## adjust table
-  resTable <- r |> 
-    mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
-    pivot_wider(names_from = var2, values_from = sdcor)
-  resTable
+  m2_mGT <- as.formula("Score ~ us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) ")
+  m2_mGT_fit <- glmmTMB::glmmTMB(m2_mGT, dat, family = gaussian, dispformula =~0)
+  m2_mGT_fit
+  lme4::VarCorr(m2_mGT_fit)
+  
+  ## extract residual var-cov matrix
+  residuals_Person <- cbind(residuals = residuals(m2_mGT_fit, "response"), 
+                            dat[c("Person_ID", "Item_ID", "Occasion")]) %>% 
+    pivot_wider(names_from = Occasion, values_from = residuals, names_prefix = "facet") %>% 
+    ungroup()
+  
+  residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
+  residual_cor
+  
+  # second run  -------------------------------------------------------------
+  dat2 = dat
+  dat2$Residual = residuals(m2_mGT_fit, "response")
+  glimpse(dat2)
+  m2_mGT2 <- as.formula("Score ~ 0 + us(Occasion + 0 | Person_ID) +  us( Occasion + 0 | Item_ID) + diag(Occasion + 0 | Residual)")
+  m2_mGT_fit2 <- glmmTMB::glmmTMB(m2_mGT2, dat2, family = gaussian, dispformula = ~0)
+  m2_mGT_fit2
+  res <- lme4::VarCorr(m2_mGT_fit2)
+  res
+  
+  extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
+                                       order = c("cov.last", "lower.tri"), residCor) 
+  {
+    order <- match.arg(order)
+    tmpf <- function(v, grp) {
+      lt.v <- lower.tri(v, diag = FALSE)
+      # vcov <- c(diag(v), v[lt.v <- lower.tri(v, diag = FALSE)])
+      sdcor <- c(attr(v, "stddev"), attr(v, "correlation")[lt.v])
+      nm <- rownames(v)
+      n <- nrow(v)
+      dd <- data.frame(grp = grp, 
+                       var1 = nm[c(seq(n), col(v)[lt.v])], 
+                       var2 = c(rep(NA, n), nm[row(v)[lt.v]]), 
+                       sdcor, 
+                       stringsAsFactors = FALSE)
+      if (order == "lower.tri") {
+        m <- matrix(NA, n, n)
+        diag(m) <- seq(n)
+        m[lower.tri(m)] <- (n + 1):(n * (n + 1)/2)
+        dd <- dd[m[lower.tri(m, diag = TRUE)], ]
+      }
+      dd
+    }
+    r <- do.call(rbind, c(mapply(tmpf, x, names(x), SIMPLIFY = FALSE), 
+                          deparse.level = 0))
+    if (attr(x, "useSc")) {
+      ss <- attr(x, "sc")
+      r <- rbind(r, data.frame(grp = "Residual", var1 = NA, 
+                               var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
+    }
+    rownames(r) <- NULL
+    r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+    
+    ## adjust table
+    resTable <- r |> 
+      mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
+      pivot_wider(names_from = var2, values_from = sdcor)
+    resTable
+  }
+  
+  resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
+  print(resDat)
 }
-
-resDat <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
-print(resDat)
 
 
 
 # Test dstudy plot --------------------------------------------------------
 res <- lmer(Score ~ (1 | Person_ID) +  ( 1 | Item_ID) + (1 | Occasion), dat = dat)
-gstudy.res <- gstudy(res)
+(gstudy.res <- gstudy(res))
+gstudy.res |> class()
 
-data.frame(
-  Item_ID_seq = seq(from = 10, to = 100, by = 10)
-)  
+## gstudyResultBoot()
+boot.gstudy <-
+  lme4::bootMer(
+    res, # lme4 object
+    gstudy.forboot,
+    nsim = 200,
+    use.u = FALSE,
+    type = "parametric",
+    parallel = "snow",
+    ncpus = 2
+)
+t(boot.gstudy$t)
 
-sapply(Item_ID_seq, \(x) dstudy(gstudy.res, n = data.frame("Item_ID" = x, "Occasion" = 20), unit = "Person_ID")[["gcoef"]])
+##
+# calculate bootstrap CI
+gstudy.res.CI <- t(apply(boot.gstudy$t, 2, \(x) {quantile(x, probs = c(.025, .975))}))
 
+cbind(gstudy.res_boot, gstudy.res.CI)
 
-
-
-sapply(dat[c("Person_ID", "Item_ID")], n_distinct)
+# Run dstudy
+dstudy(x = gstudy.res, n = list(Occasion = 100, Item_ID = 100), unit = "Person_ID") |> str()
