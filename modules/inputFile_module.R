@@ -11,7 +11,7 @@ csvFileUI <- function(id, label = "CSV file") {
       accept = ".csv",
       buttonLabel = "Upload..."
     ),
-    checkboxInput(ns("isHeaderIncluded"), "Heading?", TRUE)
+    checkboxInput(ns("isHeaderIncluded"), "Heading", TRUE)
   )
 }
 

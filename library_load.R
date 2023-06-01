@@ -7,6 +7,7 @@ library_load <-
       "MASS",
       "shiny",
       "shinyjs",
+      "shinydashboard",
       "shinyWidgets", # for widgets like progress bar
       "lme4", # for lme modeling
       "glmmTMB", # for co-variate model
