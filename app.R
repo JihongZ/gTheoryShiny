@@ -320,9 +320,8 @@ ui <- dashboardPage(
 
 # Server -----------------------------------------------------------------
 server <- function(input, output, session) {
-  # 上传数据
+  ## Read in original data ----------------------------------------
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
-  
   
   observeEvent(input$dataConfirm, {
     dat <<- datRaw()
@@ -333,6 +332,7 @@ server <- function(input, output, session) {
       inputId = "dataConfirm",
       icon = icon("check")
     )
+    
     updateTabsetPanel(
       session,
       inputId = "sidebar",
