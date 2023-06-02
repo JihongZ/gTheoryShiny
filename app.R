@@ -185,7 +185,7 @@ ui <- dashboardPage(
           tabBox(id = "modelDesign", title = tagList(icon("diagram-next"), "Design"), 
             tabPanel(title = "Formular", textOutput("recommFormular"), tags$head(tags$style("#recommFormular{color:red; font-size:14px; font-style:bold;
           overflow-y:scroll; max-height: 50px; background: ghostwhite;}"))),
-            tabPanel(title = "Structue table", DTOutput("nestedStrucTable")),
+            tabPanel(title = "Structure table", DTOutput("nestedStrucTable")),
             tabPanel(title = "Summary table", DTOutput("factorNestTable")),
             footer = p(em('Formular')," = recommended formular for linear mixed model;", br(), 
                        em('Structure table')," = auto-detected nested design in data;", br(), 
@@ -287,7 +287,7 @@ ui <- dashboardPage(
             ),
             #### Output UI for dstudy  ----
             conditionalPanel(condition = "input.confirmFacetLevel >= 1",
-                             p("Sample Size for Dstudy:"),
+                             h4("Sample Size for Dstudy:"),
                              DTOutput("updatedNDT")),
             conditionalPanel(
               condition = "input.runDstudyButton >= 1",
@@ -320,37 +320,24 @@ ui <- dashboardPage(
 
 # Server -----------------------------------------------------------------
 server <- function(input, output, session) {
-  ## Read in original data ----------------------------------------
+
+  ## Server for Page 1: Data read and transformation  ----------------------------------------
+  ### Read in original data ----------------------------------------
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
-  observeEvent(input$dataConfirm, {
-    dat <<- datRaw()
-    observeEvent(input$transform, {dat <<- datTrans()})
-    
-    updateActionButton(
-      session,
-      inputId = "dataConfirm",
-      icon = icon("check")
-    )
-    
-    updateTabsetPanel(
-      session,
-      inputId = "sidebar",
-      selected = "datastructure"
-    )
+  ### Reactive dat -----
+  dat <- eventReactive(input$dataConfirm, {
+    if(input$transform == 1){
+      datTrans()
+    }else{
+      datRaw()
+    }
   })
   
-  observeEvent(input$transform, {
-    updateTabsetPanel(
-      session,
-      inputId = "tabsetData",
-      selected = "Transformed"
-    )
-  })
-  # 显示数据
+  ### Output raw data table-----
   output$rawDataTable <- renderDT({datRaw()})
-
-  ## Server for Page 1: Wide-to-long transformation  ----------------------------------------
+  
+  ### UI selectors for facets specifications  ----------------------------------------
   #------------#
   # A bunch of reactive values:
   ## NText: 有多少行是tag/ID
@@ -393,9 +380,10 @@ server <- function(input, output, session) {
   ### 分支（1.2）: 若tag行數數目大於0，默認用戶tag信息不放在heading裡面，而在數據的前N行。將前N行tag合併成一個特殊tag ID(mergeID)進行transform。mergeID將不同facet的tag用下劃線進行區別。最後再將mergeID分離成好幾個facet列。每一列都冠以tagNames。
   ## 分支（2）：若tag前綴和tag名字都不提供且tag行數（NText）為0。則直接將除一個列（ID）以外的列進行transform。適用於single facet design。
   #------------#
-  
   datTrans <- eventReactive(input$transform, {
-    N = as.numeric(NText())
+    N <- as.numeric(NText())
+    dat <- datRaw()
+    
     if (preFixText() != "" & TagNamesText() != "") { #分支1.如果preFixText和TagNames都提供
       TagPreFix <- str_split(preFixText(), ",")[[1]]
       TagNames <- str_split(TagNamesText(), ",")[[1]]
@@ -403,24 +391,24 @@ server <- function(input, output, session) {
         if (length(TagPreFix) > 1) {
           shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
         }
-        if (sum(str_detect(colnames(datRaw()), pattern = TagPreFix)) == 0 ) {
+        if (sum(str_detect(colnames(dat), pattern = TagPreFix)) == 0 ) {
           shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
         }
-        datTrans <- dplyr::tibble(datRaw()) |>
+        datTrans <- dplyr::tibble(dat) |>
           pivot_longer(starts_with({{TagPreFix}}), names_to = TagNames, values_to = "Score")
       }else if (N > 0){ # 分支1.2:如果有facet行，将tags of facet转换为合并的ID再进行long-format转化
-        tags = datRaw()[1:N, -1] # 取出levels名字
+        tags = dat[1:N, -1] # 取出levels名字
         # 将所有facets合并成特殊ID
         mergedID = apply(tags, 2, \(x) paste0(x, collapse = "_"))
-        dat_FacetNameOmitted <- dplyr::tibble(datRaw()[-(1:N), ]) # 去掉了facet信息的纯数据
+        dat_FacetNameOmitted <- dplyr::tibble(dat[-(1:N), ]) # 去掉了facet信息的纯数据
         colnames(dat_FacetNameOmitted) <- c("ID", mergedID)
         datTrans <- dat_FacetNameOmitted |>
           pivot_longer(cols = any_of(as.character(mergedID)), values_to = "Score") |>
           separate(name, into = TagNames, sep = "_")
       }
     }else if (preFixText() == "" & TagNamesText() == "" & N == 0){
-      datTrans <- dplyr::tibble(datRaw()) |>
-        pivot_longer(any_of(colnames(datRaw())[-1]), names_to = "Facet", values_to = "Score")
+      datTrans <- dplyr::tibble(dat) |>
+        pivot_longer(any_of(colnames(dat)[-1]), names_to = "Facet", values_to = "Score")
     }else{
       # Show a modal when the button is pressed
       shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
@@ -429,14 +417,39 @@ server <- function(input, output, session) {
     datTrans
   })
 
+  ### Output transformed data table if any -----
   output$transDataTable <- renderDT({datTrans()})
-
   
+
+  ### Update UI for data confirm and switch to Tab page 2 -----
+  observeEvent(input$dataConfirm, {
+    updateActionButton(
+      session,
+      inputId = "dataConfirm",
+      icon = icon("check")
+    )
+    
+    updateTabsetPanel(
+      session,
+      inputId = "sidebar",
+      selected = "datastructure"
+    )
+  })
+  
+  observeEvent(input$transform, {
+    updateTabsetPanel(
+      session,
+      inputId = "tabsetData",
+      selected = "Transformed"
+    )
+  })
   
   ## Server for Page 2: Auto detect design of data ----------------------------------------------------
   ### Selection UI for user-selected facets / outcomes / ID ----------------------------------------
-  
   observeEvent(input$dataConfirm, {
+    dat <- dat()
+    selectedFacet <- selectedFacet()
+    
     # 选择ID
     output$selectedID <- renderUI({
       selectInput(
@@ -490,28 +503,37 @@ server <- function(input, output, session) {
       selectInput(
         "selectedFixedFacet",
         "5. Select fixed facet:",
-        choices = selectedFacet(),
-        selected = selectedFacet()[1]
+        choices = selectedFacet,
+        selected = selectedFacet[1]
       )
     })
   })
   
 
-  ## missing data server
-  observeEvent(input$variableSettingConfirm, {
-    updateActionButton(inputId = "variableSettingConfirm", icon = icon("check"))
-    method = selectedMissingMethod()
-    ## Deal with missing method
+  ## missing data inputation
+  datNARemoved <- eventReactive(input$variableSettingConfirm, {
+    dat <- dat()
+    method <- selectedMissingMethod()
+    selectedOutcome <- selectedOutcome()
+    
+    ## Deal with missing method for outcome variables
     if(method == "Zero Inputation"){
-      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), 0)
+      dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
+                                        is.na(dat[[selectedOutcome]]), 
+                                        0)
     }else if(method == "Mean Inputation"){
-      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), mean(dat[[selectedOutcome()]], na.rm = TRUE))
+      dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
+                                        is.na(dat[[selectedOutcome]]), 
+                                        mean(dat[[selectedOutcome]], na.rm = TRUE))
     }else if(method == "Median Inputation"){
-      dat[[selectedOutcome()]] <<- replace(dat[[selectedOutcome()]], is.na(dat[[selectedOutcome()]]), median(dat[[selectedOutcome()]], na.rm = TRUE))
-    }else{
-      dat <<- dat[!is.na(dat[[selectedOutcome()]]),]
+      dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
+                                        is.na(dat[[selectedOutcome]]), 
+                                        median(dat[[selectedOutcome]], na.rm = TRUE))
+    }else{ ## listwise deletion
+      dat <- dat[!is.na(dat[[selectedOutcome]]),]
     }
-
+    
+    dat
   })
   
   ### Read in user-selected facets / outcomes / ID ----------------------------------------
@@ -522,16 +544,22 @@ server <- function(input, output, session) {
   selectedFixedFacet = reactive({input$selectedFixedFacet}) ## mgtheory: fixed facet
   selectedMissingMethod = reactive({input$missingMethod}) ## selected missing data handling method
   
-  ## nestedStrc: automatically detect design of data and return structure table-----
+  ### nestedStrc: automatically detect design of data and return structure table-----
   nestedStrc <- eventReactive(input$variableSettingConfirm, {
-    if (length(selectedFacet()) == 1) { # if single facet
+    dat <- datNARemoved()
+    selectedFacet <- selectedFacet()
+    
+    if (length(selectedFacet) == 1) { # if single facet
       nestedStrc = data.frame(NA)
-      colnames(nestedStrc) = selectedFacet()
+      colnames(nestedStrc) = selectedFacet
       nestedStrc
-    }else{
-      TagPairs <- as.data.frame(t(combn(selectedFacet(), 2))) # Each row represents a pair of facets
-      colnames(TagPairs) <- c("f1", "f2")
+    }else{ # if multiple facets
+      # Each row represents a pair of facets
+      TagPairs <- as.data.frame(t(combn(selectedFacet, 2))) 
+      # Placeholder for structure table
       NestedOrCrossed = rep(NA, nrow(TagPairs))
+      # Set two facets into "f1" and "f2"
+      colnames(TagPairs) <- c("f1", "f2")
       # Compare facet with the other pair by pair
       for (pair in 1:nrow(TagPairs)) {
         whichpair = TagPairs[pair,]
@@ -543,30 +571,41 @@ server <- function(input, output, session) {
       nestedStrc
     }
   })
+  
+  ## Update UI for facet settings and switch to Tab page 3 -----
+  observeEvent(input$variableSettingConfirm, {
+    updateActionButton(inputId = "variableSettingConfirm", icon = icon("check"))
+    updateTabsetPanel(
+      session,
+      inputId = "modelDesign",
+      selected = "Structure table"
+    )
+  })
+  
+  
 
 
-   ## Formula generator for gtheory and dtheory ----
-   ## ----------------------------- ##
-   ## If there is only one facet, generate a formula as (1 | Person) + (1 | Facet)
-   ## ----------------------------- ##
-
-   ### gtheory formula ----------------------------------------
-   #------------#
-   # 若點擊確認(confirm)按鈕，根據design structure進行逐行掃描:
-   ## 分支1: 若design structure為單列，則為single facet。進行下列操作:
-   ##        1, 生成selectedOutcome() ~ (1 | unit()) + (1 | selectedFacet())
-   ## 分支2: 若design structure為多列，則為multiple facets。
-   ### 分支2.1: 若是univariate gtheory （input$mGtheory == FALSE）
-   ### 分支2.2: 若是multivariate gtheory （input$mGtheory == TRUE）
-   #------------#
+  ### Generate gtheory formula ----------------------------------------
+  #------------#
+  # 若點擊確認(confirm)按鈕，根據design structure進行逐行掃描:
+  ## 分支1: 若design structure為單列，則為single facet。進行下列操作:
+  ##        1, 生成selectedOutcome() ~ (1 | unit()) + (1 | selectedFacet())
+  ## 分支2: 若design structure為多列，則為multiple facets。
+  ### 分支2.1: 若是univariate gtheory （input$mGtheory == FALSE）
+  ### 分支2.2: 若是multivariate gtheory （input$mGtheory == TRUE）
+  #------------#
 
    gtheoryFormula <- eventReactive(input$variableSettingConfirm, {
+     formularFacets <- NULL # placeholder for formular
      nestedStrcTable <- nestedStrc() # load nested structure
-     formularFacets <- NULL
+     selectedOutcome <- selectedOutcome() # user-defined DV
+     selectedFacet <- selectedFacet() # user-defined facet(s)
+     selectedCovariates <- selectedCovariates() # user-defined covariates
+     selectedID <- unit()
 
      if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
 
-       formularText <- paste0(selectedOutcome(), " ~ (1 |", unit(), ") + ", "(1 |", selectedFacet(), ")")
+       formularText <- paste0(selectedOutcome, " ~ (1 |", unit(), ") + ", "(1 |", selectedFacet, ")")
 
      }else if (ncol(nestedStrcTable) > 1) { # 分支2:multiple facets
 
@@ -578,15 +617,13 @@ server <- function(input, output, session) {
            }
            if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
              tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
-             nested <-
-               !any(apply(tab, 1, function(x)
-                 sum(x != 0) > 1))
+             nested <- !any(apply(tab, 1, \(x) sum(x != 0) > 1))
              if (nested) {
                formularFacets <-
                  c(
                    formularFacets,
                    paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
-                   paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 1], ")"),
+                   paste0("(1 | ", selectedID, ":", nestedStrcTable[r, 1], ")"),
                    paste0(
                      "(1 | ",paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),")"
                    )
@@ -595,20 +632,20 @@ server <- function(input, output, session) {
                formularFacets <-
                  c(formularFacets,
                    paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
-                   paste0("(1 | ", input$selectedID, ":", nestedStrcTable[r, 2], ")"),
+                   paste0("(1 | ", selectedID, ":", nestedStrcTable[r, 2], ")"),
                    paste0("(1 | ", paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]), ")"))
              }
            }
          }
          ## add covariates and facets into the formulate
-         formularText <- paste0(c(selectedCovariates() , unique(formularFacets)), collapse = " + ")
-         formularText <- paste0(selectedOutcome(), " ~ (1 |", input$selectedID, ") + ", formularText)
+         formularText <- paste0(c(selectedCovariates, unique(formularFacets)), collapse = " + ")
+         formularText <- paste0(selectedOutcome, " ~ (1 |", selectedID, ") + ", formularText)
          formularText
        }else{ # 分支2.2: multivariate gtheory
          fixedfacet <- selectedFixedFacet()
-         randomfacets <- setdiff(selectedFacet(), fixedfacet)
+         randomfacets <- setdiff(selectedFacet, fixedfacet)
          formularRHS <- paste0("us(", fixedfacet, " + 0 | ", c(unit(), randomfacets), ")", collapse = " + ")
-         formularText <- paste0(selectedOutcome(), " ~ ", formularRHS)
+         formularText <- paste0(selectedOutcome, " ~ ", formularRHS)
          formularText
        }
      }else{
@@ -624,6 +661,7 @@ server <- function(input, output, session) {
 
    ### Output data design table ----------------------------------------
    observeEvent(input$variableSettingConfirm, {
+     dat <- datNARemoved()
      # 表格打印： facet嵌套
      output$nestedStrucTable <- renderDT({
        nestedStrc()
@@ -655,7 +693,7 @@ server <- function(input, output, session) {
   ###### ---
   gstudyResult <- eventReactive(input$runGstudyButton, {
     nFacet <- NULL
-    datG <- dat # data used for gstudy
+    datG <- datNARemoved() # data used for gstudy
     ## make sure outcome as numeric and facet as factors
     datG[[selectedOutcome()]] <- as.numeric(datG[[selectedOutcome()]])
     datG[c(input$selectedID, selectedFacet())] <- lapply(datG[c(input$selectedID, selectedFacet())], as.factor)
@@ -729,7 +767,7 @@ server <- function(input, output, session) {
   # return bootMer object
   ###### ---
   gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
-    datGBoot <- dat
+    datGBoot <- datNARemoved()
     datGBoot[[selectedOutcome()]] <- as.numeric(datGBoot[[selectedOutcome()]])
     datGBoot[c(input$selectedID, selectedFacet())] <- lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
     
@@ -782,18 +820,10 @@ server <- function(input, output, session) {
     content = \(file) {write.csv(gstudyResultBootCI(), file, row.names = FALSE)}
   )
   
-  ###  UI for dstudy ----------------------------------------
-  #### Output UI for facet and levels selection  ----------------------------------------
+  ###  Pre-specifications for dstudy ----------------------------------------
+  #### UI for facet and levels selection  ----------------------------------------
   observeEvent(input$runDstudyBox, {
-    ## ----------------------------- ##
-    ## 当按下确认Facet Level键
-    ## ----------------------------- ##
-    observeEvent(input$confirmFacetLevel, {
-      updatedN[selectedFacetForDstudy()] <<- selectedFacetValue()
-      output$updatedNDT <- renderDT({
-        data.frame(New = updatedN, old = defaultN)
-      })
-    })
+    defaultN <- defaultN()
     
     #------------#
     # Select which facet to add sample size
@@ -806,9 +836,10 @@ server <- function(input, output, session) {
     })
     
     #------------#
-    # Ongoing: Select levels for target facet
+    # Select levels for target facet
     #------------#
     observeEvent(input$FacetDStudySelector, {
+      selectedFacetForDstudy <- selectedFacetForDstudy()
       ###### ---
       # Facet levels slider for selected Facet
       ###### ---
@@ -816,9 +847,9 @@ server <- function(input, output, session) {
         numericInput(
           inputId = "FacetValueSlider",
           label = "Enter target level: ",
-          value = defaultN[selectedFacetForDstudy()],
+          value = defaultN[selectedFacetForDstudy],
           min = 0,
-          max = defaultN[selectedFacetForDstudy()] * 10,
+          max = defaultN[selectedFacetForDstudy] * 10,
           step = 10
         )
       })
@@ -827,32 +858,56 @@ server <- function(input, output, session) {
       # Facet levels range for dstudy plot
       ###### ---
       output$selectedMultipleFacetLevels <- renderUI({
+        startValue <- defaultN[selectedFacetForDstudy]
+        endValue <- startValue*10
         textInput(
           inputId = "FacetValueRange",
           label = "(Optional) Enter level's range: ",
-          value = "",
-          placeholder = "For example, 100:200:10 represents from 100 to 200 with step 10"
+          value = glue::glue("{startValue}:{endValue}:10"),
+          placeholder = "`100:200:10` is parsed as from 100 to 200 with step 10"
         )
       })
-      
     })
+    
+    ## ----------------------------- ##
+    ## 当按下确认Facet Level键
+    ## ----------------------------- ##
+    observeEvent(input$confirmFacetLevel, {
+      selectedFacetForDstudy <- selectedFacetForDstudy()
+      selectedFacetValue <- selectedFacetValue()
+      
+      updatedN[selectedFacetForDstudy] <<- selectedFacetValue
+      
+      ###### --- 
+      # Output updated facets' levels for dstudy
+      ###### ---
+      output$updatedNDT <- renderDT({
+        data.frame(New = updatedN, old = defaultN)
+      })
+    })
+    
   })
   
-  #### button: confirm the facet levels  ----------------------------------------
-  #------------#
-  # 当选好facet按下confirm按钮时，Read in default Facets levels in gstudy (defaultN)
-  #------------#
-  observeEvent(input$variableSettingConfirm, {
-    defaultN <<- sapply(dat[selectedFacet()], n_distinct)
-    updatedN <<- defaultN
-  })
-  
+  #### Selectors for Facet levels  ----------------------------------------
   ###### --- 
   # selectedFacetValue: Levels for certain facet
   # selectedFacetForDstudy: Facet drop-down selector for certain facet
   ###### ---
   selectedFacetValue <- reactive({input$FacetValueSlider})
   selectedFacetForDstudy <- reactive({input$FacetDStudySelector})
+  
+  #### button: confirm the facet levels  ----------------------------------------
+  defaultN <- reactive({
+    dat <- datNARemoved()
+    selectedFacet <- selectedFacet()
+    sapply(dat[selectedFacet], n_distinct)
+  })
+  
+  observeEvent(input$variableSettingConfirm, {
+    updatedN <<- defaultN()
+  })
+  
+  
   
   ### Run dstudy ----------------------------------------
   ###### --- 
@@ -864,7 +919,8 @@ server <- function(input, output, session) {
   # 5. dcoef: generalizability coefficient
   ###### ---
   dstudyResult <- eventReactive(input$runDstudyButton, {
-    datD <- dat
+    datD <- datNARemoved()
+    
     datD[[selectedOutcome()]] <- as.numeric(datD[[selectedOutcome()]])
     datD[c(input$selectedID, selectedFacet())] <- lapply(datD[c(input$selectedID, selectedFacet())], as.factor)
     
@@ -886,7 +942,7 @@ server <- function(input, output, session) {
   # return bootstrapping iterations
   ###### ---
   dstudyResultBoot <- eventReactive(input$runDstudyBootButton, {
-    datDBoot <- dat
+    datDBoot <- datNARemoved()
     datDBoot[[selectedOutcome()]] <- as.numeric(datDBoot[[selectedOutcome()]])
     datDBoot[c(input$selectedID, selectedFacet())] <- lapply(datDBoot[c(input$selectedID, selectedFacet())], as.factor)
     
