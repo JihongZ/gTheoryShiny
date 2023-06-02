@@ -213,6 +213,7 @@ ui <- dashboardPage(
                 max = 1000,
                 value = 500
               ),
+              uiOutput("nCores"),
               ## 运行gstudy
               hr(),
               strong("Gstudy："),
@@ -763,11 +764,19 @@ server <- function(input, output, session) {
   })     
   
   ### Run gstudy bootstrapping ----------------------------------------
+  output$nCores <- renderUI({
+    selectInput(inputId = "nCores",
+                label = "Select number of cores for bootstrapping:",
+                selected = parallel::detectCores()-1,
+                choices = 1:parallel::detectCores())
+  })
+  nCores <- reactive(input$nCores)
   ###### --- 
   # return bootMer object
   ###### ---
   gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
     datGBoot <- datNARemoved()
+    nCores <- nCores()
     datGBoot[[selectedOutcome()]] <- as.numeric(datGBoot[[selectedOutcome()]])
     datGBoot[c(input$selectedID, selectedFacet())] <- lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
     
@@ -779,7 +788,7 @@ server <- function(input, output, session) {
         use.u = FALSE,
         type = "parametric",
         parallel = "snow",
-        ncpus = 2
+        ncpus = nCores
       )
     
     boot.gstudy
