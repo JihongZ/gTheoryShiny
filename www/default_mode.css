@@ -1,0 +1,20 @@
+/* Get a fancy font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Slab&family=Roboto:wght@300;400&display=swap');
+
+body {
+  background-color: white;
+  color: black; /* text color */
+}
+
+/* Change header text to imported font */
+body { font-family: 'Roboto', sans-serif; font-family: 'Roboto Slab', serif;}
+
+h1 h2 h3 {
+  font-family: 'Roboto', sans-serif;
+  font-family: 'Roboto Slab', serif;
+}
+
+/* Make text visible on inputs */
+.shiny-input-container {
+  color: #474747;
+}

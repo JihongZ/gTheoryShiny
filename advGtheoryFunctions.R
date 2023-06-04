@@ -387,6 +387,8 @@ gCoef_mGTheory <- function(dat,
                            residual_cov,
                            person_ID) {
   a = matrix(rep(1, nDimension), ncol = 1) # equal weights
+  
+  ## calculate person variance components
   person_sd  <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "stddev")
   person_cor <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "correlation")
   person_cov <- diag(person_sd)%*%person_cor%*%diag(person_sd)

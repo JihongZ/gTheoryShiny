@@ -17,10 +17,16 @@ missingMethods = c(
 source("library_load.R")
 source("advGtheoryFunctions.R")
 
+## Include elements of html
+source("tutorial_page.R")
+
 ## Source all modules
 source("modules/inputFile_module.R") # Input CSV file
 source("modules/LongToWide_module.R") # Long format to Wide format
 
+## Load example data
+data("Rajaratnam.2", package = "gtheory")
+data("Brennan.3.2", package = "gtheory")
 # UI ----------------------------------------------------------------------
 ui <- dashboardPage(
   skin = "purple",
@@ -31,11 +37,8 @@ ui <- dashboardPage(
     sidebarMenu(
       id = "sidebar", 
       menuItem(
-        "Tutorial",
-        tabName = "tutorial",
-        icon = icon("dashboard"),
-        badgeLabel = "Ver. 0.2beta",
-        badgeColor = "purple"
+        "Tutorial", tabName = "tutorial", icon = icon("dashboard"),
+        badgeLabel = "Ver.0.2.Beta", badgeColor = "purple"
       ),
       menuItem("Data Input", tabName = "datainput", icon = icon("th")),
       menuItem("Data Structure", tabName = "datastructure", icon = icon("table")),
@@ -46,86 +49,47 @@ ui <- dashboardPage(
   dashboardBody(
     tabItems(
       ### Tab Page 0: Tutorial ----
-      tabItem(tabName = "tutorial",
-              # Sidebar with a slider input for number of bins
-              fluidPage(
-                # title
-                titlePanel("GtheoryShiny Tutorial"),
-                h4("Example data:"),
-                p(
-                  span("SyntheticDataSetNo.4.csv", style = "color:blue"),
-                  " is a example data with two facets including",
-                  strong("Test and Rater"),
-                  "; ID variable is",
-                  strong("Person"),
-                  "; Outcome variable is",
-                  strong("Score"),
-                  "."
-                ),
-                
-                
-                h4("Step 1: Read in example data or transformation"),
-                p(
-                  "Click ",
-                  strong("Data Input"),
-                  " tab on the top navigation panel will open the page for data input and transformation. Chick Upload button and select the data. Check the ",
-                  em('long-format'),
-                  " checkbox under the Data property section."
-                ),
-                
-                h4("Step 2: Specify each column's type"),
-                p(
-                  "Click ",
-                  em("Data Structure"),
-                  " tab. Select ",
-                  strong("Person"),
-                  " for ",
-                  em("which column represents ID"),
-                  " question."
-                ),
-                p(
-                  "Then check ",
-                  strong("Subset, Item, Rater, Ocasion"),
-                  " for ",
-                  em("Which column(s) represent facets"),
-                  " question."
-                ),
-                p(
-                  "Finally select ",
-                  strong("Score"),
-                  " for ",
-                  em("Which column represents outcome"),
-                  " question."
-                ),
-                
-                h4("Step 3: Run data analysis"),
-                p("After confirm the facets/ID/Outcomes of data, click ", strong("Data Analysis"), " tab for the gtheory estimation. Note that the recommended formula for gtheory has been given to you in previous tab page. Alternatively, you may want to specify your formula in ", em("User-specified formula"), " section. Besides, you can choose the link function for the model. Finally, boostrap iterations can been selected for the bootstrapping standard diviation estimation." ), 
-                p("Chick ",strong("Run"), " button to estimate and output gstudy results in the right panel. Then, download buttons called ", strong("Download gstudy result"), " will pop up for users to download factor scores or variance-covariance components."),
-                ## notes
-                h3("Updates (2023-02-12):"),
-                p("This app has the function to estimate the fixed effects of covariates. To use this function, check", em("covariates"), "in Data Structure tab page. Then, the fixed effects estimates will be printed after users click ", em("gtheory estimate"), "button in Data Analysis tag page."),
-                h3("Updates (2023-06-03):"),
-                p("Upgrade the UI framework of app to shinydashboard; Univariate Gtheory has been texted. Testing of multivariate gtheory is ongoing. Currently the estimation of mGtheory uses", em('glmmTMB'), "package")
-        )
-      ),
+      tabItem(tabName = "tutorial", tutorial_page),
       
       ### Tag Page 1: Transform data  ----
       tabItem(tabName = "datainput",
         fluidPage(
           box(title = "Input data file", 
               status = "info", solidHeader = TRUE, width = 4, 
-              csvFileUI("fileUpload", ""),
-              prettySwitch("isLongFormat", "Long format", value = TRUE, status = "info"),
+              switchInput(
+                inputId = "fileUploadSwitch",
+                value = TRUE, 
+                onLabel = "Uploaded data",
+                offLabel = "Example data",
+                onStatus = "success",
+                offStatus = "danger",
+                width = "80%", 
+                size = 'normal'
+              ),
+              conditionalPanel( # if uncheck the switch, let client select the example data
+                condition = "input.fileUploadSwitch == 0", 
+                radioGroupButtons(
+                  inputId = "selectedExpDat",
+                  label = "Example data: ",
+                  choices = c("Rajaratnam.2", "Brennan.3.2"),
+                  direction = "vertical"
+                )
+              ),
               conditionalPanel(
-                condition = "input.isLongFormat == 0",
-                hr(),
-                h4("Pivot data from wide to long: "),
-                uiOutput("nRowsSelection"),
-                uiOutput("preFixText"),
-                uiOutput("TagNamesText"),
-                ## 转换
-                actionBttn("transform", tagList(icon("rotate"), "Transform"), 
-                           style = "jelly", color = "primary", size = "sm"),
+                condition = "input.fileUploadSwitch == 1", 
+                csvFileUI("fileUpload", ""),
+                prettySwitch("isLongFormat", "Long format", value = TRUE, status = "info"),
+                conditionalPanel(
+                  condition = "input.isLongFormat == 0",
+                  hr(),
+                  h4("Pivot data from wide to long: "),
+                  uiOutput("nRowsSelection"),
+                  uiOutput("preFixText"),
+                  uiOutput("TagNamesText"),
+                  ## 转换
+                  actionBttn("transform", tagList(icon("rotate"), "Transform"), 
+                             style = "jelly", color = "primary", size = "sm"),
+                )
               ),
               ## 确定
               br(),
@@ -186,8 +150,9 @@ ui <- dashboardPage(
       ### Tab Page 3: Data Analysis  ----
       tabItem(tabName = "dataanalysis",
         fluidRow(
+          
           column(width = 4,
-            box(title = "Control Panel: ", status = "danger", solidHeader = TRUE, height = 520, 
+            box(title = "Control Panel: ", status = "danger", solidHeader = TRUE, width = NULL, 
                 textInput("selfFormular", "1. User-specified formula: ",
                           placeholder = "Default: recommeded formula"),
                 pickerInput(
@@ -205,11 +170,14 @@ ui <- dashboardPage(
                 ),
                 uiOutput("nCores")
             ),
-            box(title = "Gstudy Estimation", status = "info", solidHeader = TRUE, height = 250,
+            
+            box(title = "Gstudy Estimation", status = "info", solidHeader = TRUE, width = NULL,
                 actionBttn("runGstudyButton", "Run Gstudy", style = "material-flat",
-                           color = "primary", size = "sm"),
+                           color = "primary", size = "sm", icon = icon('circle-play')),
+                br(), br(),
                 actionBttn("runGstudyBootButton", "Run Bootstrap", style = "material-flat", 
                            color = "primary", size = "sm", icon = icon("bootstrap")),
+                br(), br(),
                 progressBar(
                   id = "gstudybar",
                   value = 0,
@@ -219,33 +187,37 @@ ui <- dashboardPage(
                   display_pct = TRUE
                 ),
                 ### 下载按钮
+                br(), br(),
                 conditionalPanel(
                   condition = "input.runGstudyButton >=1",
                   downloadButton("downloadGstudyTheta", "Factor Score Table")
                 ),
+                br(), br(),
                 conditionalPanel(
                   condition = "input.runGstudyBootButton >=1",
                   downloadButton("downloadGstudyBootResult", "Bootstrapping Result")
                 )
             ),
-            box(title = "Dstudy Estimation", status = "warning", solidHeader = TRUE, height = 250, 
-                prettySwitch("runDstudyBox", label = "Run Dstudy", FALSE),
+            
+            box(title = "Dstudy Estimation", status = "warning", solidHeader = TRUE, width = NULL,
+                prettySwitch("runDstudyBox", label = "Run Dstudy", 
+                             value = FALSE,
+                             bigger = TRUE),
                 conditionalPanel(condition = "input.runDstudyBox == 1",
                   h4("Dstudy："),
-                  ### 选择要修改的facet
+                  ### 选择要修改的facet和number of conditions
                   uiOutput("selectedFacetMenu"),
-                  #选择一个facet的levels：可以用一个数字，也可以选择一串数字
                   uiOutput("selectedFacetLevels"),
                   uiOutput("selectedMultipleFacetLevels"),
                   #选择factor levels
                   actionBttn(inputId = "confirmFacetLevel",
-                             label = "Add facet levels", 
+                             label = "Add facet levels", icon = icon("check"),
                              style = "material-flat", color = "primary", size = "sm"),
-                  actionBttn("runDstudyButton", "Run", 
+                  actionBttn("runDstudyButton", "Run", icon = icon('circle-play'),
                              style = "material-flat", color = "primary", size = "sm"),
                   actionBttn("runDstudyBootButton", "Run Bootstrap", icon = icon("bootstrap"),
                              style = "material-flat", color = "primary", size = "sm"),
-                  actionBttn("plotDstudyCoef", "Visualize", 
+                  actionBttn("plotDstudyCoef", "Visualize", icon = icon('image'),
                              style = "material-flat", color = "primary", size = "sm"),
                   progressBar(id = "dstudybar", 
                               value = 0,
@@ -262,15 +234,19 @@ ui <- dashboardPage(
                 )
             )
           ),
+          
           column(width = 8,
-            box(title = "Gstudy Result", width = 6, collapsible = TRUE, collapsed = TRUE,
+            box(title = "Gstudy Result", width = NULL, collapsible = TRUE, collapsed = FALSE,
+                solidHeader = TRUE, status = 'info', 
+                #### Output UI for gstudy  ----
                 conditionalPanel(
                   condition = "input.runGstudyButton >= 1",
-                  h4("Gstudy Output："),
-                  h5("Fixed Effects Output："),
+                  h4("Fixed Effects Output："),
                   DTOutput("recommModelFixedEffectResult"),
-                  h5("Random Effects Output："),
-                  DTOutput("GstudyResultPrint")
+                  h4("Random Effects Output："),
+                  DTOutput("GstudyResultPrint"),
+                  h4("Other Output："),
+                  verbatimTextOutput("GstudyResultExtraPrint")
                 ),
                 # gstudy with bootstrapping SD
                 conditionalPanel(
@@ -279,7 +255,9 @@ ui <- dashboardPage(
                   DTOutput("recommModelGStudyBootResult")
                 )
             ),
-            box(title = "Dstudy Result", width = 6, collapsible = TRUE, collapsed = TRUE,
+            
+            box(title = "Dstudy Result", width = NULL, collapsible = TRUE, collapsed = FALSE,
+                solidHeader = TRUE, status = 'info', 
                 #### Output UI for dstudy  ----
                 conditionalPanel(condition = "input.confirmFacetLevel >= 1",
                                  h4("Sample Size for Dstudy:"),
@@ -303,11 +281,16 @@ ui <- dashboardPage(
                   plotOutput("DstudyCoefPlot")
                 )            
             )
+            
           )
+          
         )
       )
     )
-  ) # End of dashboardBody
+  ), # End of dashboardBody
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "default_mode.css")
+  )
 ) # End of dashboardPage
 
 
@@ -322,17 +305,26 @@ server <- function(input, output, session) {
   
   ### Reactive dat -----
   dat <- eventReactive(input$dataConfirm, {
-    if(input$transform == 1){
-      datTrans()
-    }else{
-      datRaw()
+    if (input$fileUploadSwitch == 0) { # if use example data
+      dat = get(input$selectedExpDat)
+      dat
+    }else{ # if use user-uploaded data
+      if(input$transform == 1){
+        datTrans()
+      }else{
+        datRaw()
+      }
     }
   })
   
   ### Output raw data table-----
   output$rawDataTable <- renderDT({
-    datatable(datRaw()) |> 
-      formatRound(colnames(datRaw())[sapply(datRaw(), is.numeric)], digits = 3)
+    if (input$fileUploadSwitch == 0) {
+      get(input$selectedExpDat)
+    }else{
+      datatable(datRaw()) |> 
+        formatRound(colnames(datRaw())[sapply(datRaw(), is.numeric)], digits = 3)
+    }
   })
   
   ### UI selectors for facets specifications  ----------------------------------------
@@ -559,7 +551,7 @@ server <- function(input, output, session) {
   ### nestedStrc: automatically detect design of data and return structure table-----
   nestedStrc <- eventReactive(input$variableSettingConfirm, {
     dat <- datNARemoved()
-    selectedFacet <- selectedFacet()
+    selectedFacet <- c(selectedFacet(), unit()) # facets and ID
     
     if (length(selectedFacet) == 1) { # if single facet
       nestedStrc = data.frame(NA)
@@ -569,17 +561,17 @@ server <- function(input, output, session) {
       # Each row represents a pair of facets
       TagPairs <- as.data.frame(t(combn(selectedFacet, 2))) 
       # Placeholder for structure table
-      NestedOrCrossed = rep(NA, nrow(TagPairs))
+      NestedorCrossed = rep(NA, nrow(TagPairs))
       # Set two facets into "f1" and "f2"
       colnames(TagPairs) <- c("f1", "f2")
       # Compare facet with the other pair by pair
       for (pair in 1:nrow(TagPairs)) {
         whichpair = TagPairs[pair,]
-        isNested <- sjmisc::is_nested(dat[[whichpair[[1]]]], dat[[whichpair[[2]]]])
-        NestedOrCrossed[pair] = ifelse(isNested, "Nested", "Crossed")
+        isNested <- suppressMessages(sjmisc::is_nested(dat[[whichpair[[1]]]], dat[[whichpair[[2]]]]))
+        NestedorCrossed[pair] = ifelse(isNested, "Nested", "Crossed")
       }
       nestedStrc = TagPairs
-      nestedStrc$NestedOrCrossed = NestedOrCrossed
+      nestedStrc$NestedorCrossed = NestedorCrossed
       nestedStrc
     }
   })
@@ -617,46 +609,42 @@ server <- function(input, output, session) {
 
      if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
 
-       formularText <- paste0(selectedOutcome, " ~ (1 |", unit(), ") + ", "(1 |", selectedFacet, ")")
+       formularText <- glue::glue("{selectedOutcome} ~ (1 |{selectedID}) + (1 |{selectedFacet})")
 
      }else if (ncol(nestedStrcTable) > 1) { # 分支2:multiple facets
-
        if (input$mGtheory == FALSE) { # 分支2.1: univariate gtheory
-         for (r in 1:nrow(nestedStrcTable)) {
-           if (nestedStrcTable[r, "NestedOrCrossed"] == "Crossed") {
-             formularFacets <-
-               c(formularFacets,paste0("(1 | ", nestedStrcTable[r, 1:2], ")"))
+         for (r in 1:nrow(nestedStrcTable)) { # loop over each row
+           if (nestedStrcTable[r, "NestedorCrossed"] == "Crossed") {
+             formularFacets <- c(formularFacets, 
+                                 glue::glue("(1 | {nestedStrcTable[r, 1:2]})"))
            }
-           if (nestedStrcTable[r, "NestedOrCrossed"] == "Nested") {
+           if (nestedStrcTable[r, "NestedorCrossed"] == "Nested") {
              tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
              nested <- !any(apply(tab, 1, \(x) sum(x != 0) > 1))
              if (nested) {
                formularFacets <-
                  c(
                    formularFacets,
-                   paste0("(1 | ", paste0(nestedStrcTable[r, 1]), ")"),
-                   paste0("(1 | ", selectedID, ":", nestedStrcTable[r, 1], ")"),
-                   paste0(
-                     "(1 | ",paste0(nestedStrcTable[r, 2], ":", nestedStrcTable[r, 1]),")"
-                   )
-                 )
+                   glue::glue("(1 | {nestedStrcTable[r, 1]})"),
+                   glue::glue("(1 | {nestedStrcTable[r, 2]}:{nestedStrcTable[r, 1]})")
+                  )
              } else{
                formularFacets <-
                  c(formularFacets,
-                   paste0("(1 | ", paste0(nestedStrcTable[r, 2]), ")"),
-                   paste0("(1 | ", selectedID, ":", nestedStrcTable[r, 2], ")"),
-                   paste0("(1 | ", paste0(nestedStrcTable[r, 1], ":", nestedStrcTable[r, 2]), ")"))
+                   glue::glue("(1 | {nestedStrcTable[r, 2]})"),
+                   glue::glue("(1 | {nestedStrcTable[r, 1]}:{nestedStrcTable[r, 2]})")
+                  )
              }
            }
          }
          ## add covariates and facets into the formulate
          formularText <- paste0(c(selectedCovariates, unique(formularFacets)), collapse = " + ")
-         formularText <- paste0(selectedOutcome, " ~ (1 |", selectedID, ") + ", formularText)
+         formularText <- glue::glue("{selectedOutcome} ~ {formularText}")
          formularText
        }else{ # 分支2.2: multivariate gtheory
          fixedfacet <- selectedFixedFacet()
-         randomfacets <- setdiff(selectedFacet, fixedfacet)
-         formularRHS <- paste0("us(", fixedfacet, " + 0 | ", c(unit(), randomfacets), ")", collapse = " + ")
+         randomfacets <- c(selectedID, setdiff(selectedFacet, fixedfacet))
+         formularRHS <- paste0(glue::glue("us({fixedfacet} + 0 | {randomfacets})"), collapse = " + ")
          formularText <- paste0(selectedOutcome, " ~ ", formularRHS)
          formularText
        }
@@ -695,7 +683,6 @@ server <- function(input, output, session) {
 
   ### Run gstudy  ----------------------------------------
   #### Link Functions  ----------------------------------------
-  
   linkFuncText <- reactive({input$linkFunc})
   
   ###### --- 
@@ -765,10 +752,13 @@ server <- function(input, output, session) {
         ## extract residual var-cov matrix
         residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
                                   datG[c(unit(), selectedFacet())]) %>%
-          pivot_wider(names_from = selectedFixedFacet(), values_from = residuals, names_prefix = "facet") %>%
+          pivot_wider(names_from = selectedFixedFacet(), 
+                      values_from = residuals, names_prefix = "facet") %>%
           ungroup()
-        residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")))
-        residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")))
+        residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")),
+                           use = "pairwise.complete.obs")
+        residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")),
+                           use = "pairwise.complete.obs")
         
         ## run second time
         dat2 = datG
@@ -788,6 +778,7 @@ server <- function(input, output, session) {
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
+        
         g_coef <- gCoef_mGTheory(
           dat = datG[c(unit(), selectedFacet())],
           nDimension = n_distinct(datG[selectedFixedFacet()]),
@@ -801,7 +792,7 @@ server <- function(input, output, session) {
           lmmFit = lmmFit,
           fixedEffect = fixedEffectEstimate,
           VarComp = resVarCor,
-          mgstudy = NULL # retrun a mgstudy class
+          g_coef = g_coef # retrun a mgstudy class
         )
         
       } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
@@ -874,6 +865,11 @@ server <- function(input, output, session) {
     datatable(res) |> 
       formatRound(colnames(res)[sapply(res, is.numeric)], digits = 3)
   })
+  output$GstudyResultExtraPrint <- renderText({
+    if (input$mGtheory == TRUE) {
+      glue::glue("g-coefficient: {gstudyResult()$g_coef}")
+    }
+  })
   output$recommModelGStudyBootResult <- renderDT({
     res <- gstudyResultBootCI()
     datatable(res) |> 
@@ -896,7 +892,7 @@ server <- function(input, output, session) {
   )
   
   ###  Pre-specifications for dstudy ----------------------------------------
-  #### UI for facet and levels selection  ----------------------------------------
+  #### UI for facet and condition selection  ----------------------------------------
   observeEvent(input$runDstudyBox, {
     defaultN <- defaultN()
     
@@ -911,7 +907,7 @@ server <- function(input, output, session) {
     })
     
     #------------#
-    # Select levels for target facet
+    # Select number of conditions for target facet
     #------------#
     observeEvent(input$FacetDStudySelector, {
       selectedFacetForDstudy <- selectedFacetForDstudy()
@@ -921,7 +917,7 @@ server <- function(input, output, session) {
       output$selectedFacetLevels <- renderUI({
         numericInput(
           inputId = "FacetValueSlider",
-          label = "Enter target level: ",
+          label = "Enter number of conditions: ",
           value = defaultN[selectedFacetForDstudy],
           min = 0,
           max = defaultN[selectedFacetForDstudy] * 10,
@@ -937,7 +933,7 @@ server <- function(input, output, session) {
         endValue <- startValue*10
         textInput(
           inputId = "FacetValueRange",
-          label = "(Optional) Enter level's range: ",
+          label = "(Optional) Enter the range of conditions: ",
           value = glue::glue("{startValue}:{endValue}:10"),
           placeholder = "`100:200:10` is parsed as from 100 to 200 with step 10"
         )
@@ -965,7 +961,7 @@ server <- function(input, output, session) {
   
   #### Selectors for Facet levels  ----------------------------------------
   ###### --- 
-  # selectedFacetValue: Levels for certain facet
+  # selectedFacetValue: number of conditions for certain facet
   # selectedFacetForDstudy: Facet drop-down selector for certain facet
   ###### ---
   selectedFacetValue <- reactive({input$FacetValueSlider})
