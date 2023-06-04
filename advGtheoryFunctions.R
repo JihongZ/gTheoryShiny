@@ -70,29 +70,36 @@ extractTheta <- function(x) {
 #function
 gstudy.forboot <- function(x, fixed = NULL) {
   tmp <- as.data.frame(VarCorr(x))
-  tmp <- tmp[c(1,4)]
-  no.match <- function(x) {x[-match(fixed, x)]}
-  if(!is.null(fixed)){
-    n_adj <- length(unique(x@frame[,grep(fixed, names(x@frame))]))
-    fixed_vars <- tmp[grep(fixed, tmp$grp),]
-    fixed_vars <- fixed_vars[-match(fixed, fixed_vars$grp),]
-    fixed_vars$adj_vcov <- fixed_vars$vcov/n_adj;fixed_vars$vcov <- NULL
+  tmp <- tmp[c(1, 4)]
+  no.match <- function(x) {
+    x[-match(fixed, x)]
+  }
+  if (!is.null(fixed)) {
+    n_adj <- length(unique(x@frame[, grep(fixed, names(x@frame))]))
+    fixed_vars <- tmp[grep(fixed, tmp$grp), ]
+    fixed_vars <- fixed_vars[-match(fixed, fixed_vars$grp), ]
+    fixed_vars$adj_vcov <-
+      fixed_vars$vcov / n_adj
+    fixed_vars$vcov <- NULL
     add_back <- strsplit(fixed_vars$grp, ":")
     fixed_vars$grp <- sapply(add_back, no.match)
-    two.way <- data.frame(grp = paste(fixed_vars$grp, collapse = ":"), adj_vcov = tmp[nrow(tmp),2]/n_adj)
+    two.way <-
+      data.frame(grp = paste(fixed_vars$grp, collapse = ":"),
+                 adj_vcov = tmp[nrow(tmp), 2] / n_adj)
     fixed_vars <- rbind(fixed_vars, two.way)
     tmp <- merge(tmp, fixed_vars)
-    tmp[,2] <- tmp[,2] + tmp[,3]; tmp[,3] <- NULL
+    tmp[, 2] <- tmp[, 2] + tmp[, 3]
+    tmp[, 3] <- NULL
     tmp$grp[length(tmp$grp)] <- "Residual"
   }
   colnames(tmp) <- c("Source", "Est.Variance")
-  tmp$Percent.Variance <- tmp$Est.Variance/sum(tmp$Est.Variance)
-  tmp[,2] <- round(tmp[,2], 4)
-  tmp[,3] <- paste0(round(tmp[,3] * 100,1), "%")
+  tmp$Percent.Variance <- tmp$Est.Variance / sum(tmp$Est.Variance)
+  tmp[, 2] <- round(tmp[, 2], 4)
+  tmp[, 3] <- paste0(round(tmp[, 3] * 100, 1), "%")
   N <- length(x@resp$y)
   output <- list(gstudy.out = tmp, nobs = N)
   class(output) <- "gStudy"
-  output$gstudy.out[,2]
+  output$gstudy.out[, 2]
 }
 
 #function and variable
@@ -364,50 +371,34 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
   ## adjust table
   resTable <- r |> 
     mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
-    pivot_wider(names_from = var2, values_from = sdcor)
+    pivot_wider(names_from = var2, values_from = sdcor) |> 
+    mutate(Est.Variance = Std.Dev^2) |> 
+    dplyr::select(-Std.Dev) |> 
+    rename(Source = grp, Fixed.Facet = var1) |> 
+    relocate(Source, Fixed.Facet, Est.Variance)
   resTable
 }
 
 
-### Extract var-cov from glmmTMB object ----------------------------------------
-
-
-extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
-                                     order = c("cov.last", "lower.tri"), residCor) 
-{
-  order <- match.arg(order)
-  tmpf <- function(v, grp) {
-    lt.v <- lower.tri(v, diag = FALSE)
-    # vcov <- c(diag(v), v[lt.v <- lower.tri(v, diag = FALSE)])
-    sdcor <- c(attr(v, "stddev"), attr(v, "correlation")[lt.v])
-    nm <- rownames(v)
-    n <- nrow(v)
-    dd <- data.frame(grp = grp, 
-                     var1 = nm[c(seq(n), col(v)[lt.v])], 
-                     var2 = c(rep(NA, n), nm[row(v)[lt.v]]), 
-                     sdcor, 
-                     stringsAsFactors = FALSE)
-    if (order == "lower.tri") {
-      m <- matrix(NA, n, n)
-      diag(m) <- seq(n)
-      m[lower.tri(m)] <- (n + 1):(n * (n + 1)/2)
-      dd <- dd[m[lower.tri(m, diag = TRUE)], ]
-    }
-    dd
-  }
-  r <- do.call(rbind, c(mapply(tmpf, x, names(x), SIMPLIFY = FALSE), 
-                        deparse.level = 0))
-  if (attr(x, "useSc")) {
-    ss <- attr(x, "sc")
-    r <- rbind(r, data.frame(grp = "Residual", var1 = NA, 
-                             var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
-  }
-  rownames(r) <- NULL
-  r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+# generalizability coefficient
+gCoef_mGTheory <- function(dat,
+                           nDimension,
+                           glmmTMBObj,
+                           residual_cov,
+                           person_ID) {
+  a = matrix(rep(1, nDimension), ncol = 1) # equal weights
+  person_sd  <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "stddev")
+  person_cor <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "correlation")
+  person_cov <- diag(person_sd)%*%person_cor%*%diag(person_sd)
   
-  ## adjust table
-  resTable <- r |> 
-    mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
-    pivot_wider(names_from = var2, values_from = sdcor)
-  resTable
+  rho = 1 / ( 1 + (t(a)%*%residual_cov%*%a) / (t(a)%*%person_cov%*%a))
+  rho
+}
+
+
+## Print fixed effects and g-coefficients for mG-theory
+extractFixedCoefsmG <- \(lmeObj){
+  fixedEstTable <- summary(lmeObj)$coefficients$cond
+  colnames(fixedEstTable) <- c("Estimate", "SE", "Z", "p-value")
+  as.data.frame(fixedEstTable)
 }
