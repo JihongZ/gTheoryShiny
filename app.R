@@ -75,7 +75,7 @@ ui <- dashboardPage(
                   direction = "vertical"
                 )
               ),
-              conditionalPanel(
+              conditionalPanel( # if check the switch, let client select self data
                 condition = "input.fileUploadSwitch == 1", 
                 csvFileUI("fileUpload", ""),
                 prettySwitch("isLongFormat", "Long format", value = TRUE, status = "info"),
@@ -127,16 +127,18 @@ ui <- dashboardPage(
               hr(),
               uiOutput("selectedCovariates"),
               uiOutput("mGtheory"),
-              
               conditionalPanel(
                 condition = "input.mGtheory == 1",
-                uiOutput("selectedFixedFacet")
+                uiOutput("selectedFixedFacet"),
+                uiOutput("selectedFacetWithDiagonalComponent"), # facet with diagonal components
+                uiOutput("selectedFacetWithUSComponent") # facet with unstructured components
               ),
               actionBttn("variableSettingConfirm", "Confirm", 
                          icon = icon("circle"), style = "jelly", color = "primary", size = "sm")
           ),
           tabBox(id = "modelDesign", title = tagList(icon("diagram-next"), "Design"), 
-            tabPanel(title = "Formular", textOutput("recommFormular"), tags$head(tags$style("#recommFormular{color:red; font-size:14px; font-style:bold;
+            tabPanel(title = "Formular", textOutput("recommFormular"), 
+                     tags$head(tags$style("#recommFormular{color:red; font-size:14px; font-style:bold;
           overflow-y:scroll; max-height: 50px; background: ghostwhite;}"))),
             tabPanel(title = "Structure table", DTOutput("nestedStrucTable")),
             tabPanel(title = "Summary table", DTOutput("factorNestTable")),
@@ -510,6 +512,36 @@ server <- function(input, output, session) {
         selected = selectedFacet()[1]
       )
     })
+    
+    # mgTheory选择 facet with diagonal var-cov matrix
+    output$selectedFacetWithDiagonalComponent <- renderUI({
+      random_facets <- c(unit(), setdiff(selectedFacet(), input$selectedFixedFacet))
+      pickerInput(
+        "selectedFacetWithDiagonalComponent",
+        "6. Select fixed facet with diagnonal component:",
+        choices = random_facets,
+        selected = random_facets[1],
+        multiple = TRUE
+      )
+    })
+    
+    # mgTheory选择 facet with unstructured var-cov matrix
+    observeEvent(input$selectedFacetWithDiagonalComponent, {
+      output$selectedFacetWithUSComponent <- renderUI({
+        left_facets <- setdiff(c(unit(), selectedFacet()), 
+                               c(input$selectedFixedFacet, 
+                               input$selectedFacetWithDiagonalComponent))
+        pickerInput(
+          "selectedFixedFacet",
+          "7. Select fixed facet with full component:",
+          choices = left_facets,
+          selected = left_facets[1],
+          multiple = TRUE
+        )
+      })
+    })
+    
+    
   })
   
 
@@ -778,7 +810,6 @@ server <- function(input, output, session) {
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
-        
         g_coef <- gCoef_mGTheory(
           dat = datG[c(unit(), selectedFacet())],
           nDimension = n_distinct(datG[selectedFixedFacet()]),

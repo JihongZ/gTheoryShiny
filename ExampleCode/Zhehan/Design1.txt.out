@@ -1,0 +1,255 @@
+
+
+****************************************************************************************
+****************************************************************************************
+
+
+                 GGGGGGG     EEEEEEEE    N       N     OOOOO      V       V       AAA   
+                G       G    E           N N     N   O       O    V       V      A   A  
+MM        MM    G            E           N  N    N   O       O    V       V     A     A 
+MMM      MMM    G            EEEEE       N   N   N   O       O    V       V    AAAAAAAAA
+MM M    M MM    G     GGG    E           N    N  N   O       O     V     V     A       A
+MM  M  M  MM    G       G    E           N     N N   O       O      V   V      A       A
+MM   MM   MM     GGGGGGG     EEEEEEEE    N       N     OOOOO          V        A       A
+
+
+                Version 2.1                             Robert L. Brennan               
+                 July 2001                            Iowa Testing Programs             
+            All Rights Reserved                         University of Iowa              
+
+****************************************************************************************
+****************************************************************************************
+
+
+                             CONTROL CARDS FOR RUN 1
+                     Control Cards File Name:  Design1.txt
+         p x i Design for Rajaratnam, Cronbach, & Gleser (1965) Example
+
+GSTUDY   p x i Design for Rajaratnam, Cronbach, & Gleser (1965) Example
+COMMENT
+COMMENT  Multivariate G Design#1.  
+COMMENT  Multivariate G Design#1.
+COMMENT  Multivariate G Design#1.
+COMMENT
+OPTIONS  NREC 8  "*.out"  TIME  DEFAULT_DSTUDY
+MULT     2 First Second 
+EFFECT   * p    100 100  
+EFFECT   # i    12
+12
+FORMAT   0 0
+PROCESS   "C:\Users\z380j550\Dropbox\G theory study\mGENOVA\mGENOVA for PC\Dat1.txt"
+
+
+                             INPUT RECORDS FOR RUN 1
+         p x i Design for Rajaratnam, Cronbach, & Gleser (1965) Example
+
+RECORD NUMBER 1:
+ 47.259  50.510  51.415  49.125  47.890  50.251  52.013  48.485  48.838  50.594
+ 53.685  51.441  61.600  59.648  59.739  57.681  63.689  60.861  63.974  60.098
+ 59.213  61.698  62.991  62.664 
+RECORD NUMBER 2:
+ 42.151  51.681  46.752  48.781  46.118  50.784  48.969  45.540  46.707  50.453
+ 49.048  47.385  54.476  58.999  56.954  57.504  59.721  58.397  57.372  58.369
+ 59.108  63.143  58.880  61.527 
+RECORD NUMBER 3:
+ 49.720  52.166  48.522  51.543  52.214  54.294  53.344  52.176  51.816  49.966
+ 47.858  51.561  62.489  64.008  58.257  60.720  67.131  62.607  62.011  63.622
+ 61.791  63.195  60.543  64.203 
+RECORD NUMBER 4:
+ 45.964  51.091  50.872  48.434  49.336  54.219  47.164  49.394  51.662  51.529
+ 55.195  45.500  60.416  56.889  59.336  61.460  63.575  60.737  58.599  60.444
+ 60.615  61.822  63.087  59.951 
+RECORD NUMBER 5:
+ 48.255  52.648  52.354  54.029  47.517  47.307  48.696  46.677  47.593  52.475
+ 51.328  46.648  58.030  59.998  59.554  62.739  65.287  61.077  60.930  62.074
+ 57.842  63.160  64.227  63.273 
+RECORD NUMBER 6:
+ 45.377  52.776  49.973  50.138  47.804  53.695  51.327  49.133  54.500  50.010
+ 55.864  48.755  58.621  58.260  57.201  58.483  59.631  61.568  60.424  59.471
+ 60.213  61.773  61.485  65.023 
+RECORD NUMBER 7:
+ 49.019  50.907  53.947  49.541  48.928  51.286  49.409  51.468  49.816  49.928
+ 47.402  51.736  62.322  57.724  57.946  58.914  60.678  59.684  56.407  61.099
+ 56.009  58.760  58.890  60.581 
+RECORD NUMBER 8:
+ 52.112  51.179  53.636  52.281  52.279  54.710  54.361  49.838  57.938  53.458
+ 50.544  54.910  59.214  59.703  59.991  60.660  61.955  60.280  60.579  59.576
+ 60.459  60.807  61.796  63.567 
+
+
+              G STUDY VARIANCE AND COVARIANCE COMPONENTS FOR RUN 1
+         p x i Design for Rajaratnam, Cronbach, & Gleser (1965) Example
+
+
+
+INFORMATION ABOUT VARIABLE 1:  First
+
+Number of levels of i = 12
+Order  of levels of i = 1 2 3 4 5 6 7 8 9 10 11 12 
+
+Means for i 
+
+ 47.280  50.133  50.320  49.064  48.447  51.190  49.741  48.344  48.508  50.871
+ 49.970  48.901 
+
+Grand mean:     49.39733
+
+
+INFORMATION ABOUT VARIABLE 2:  Second
+
+Number of levels of i = 12
+Order  of levels of i = 13 14 15 16 17 18 19 20 21 22 23 24 
+
+Means for i 
+
+ 58.948  59.448  58.703  58.879  61.503  60.103  59.157  59.780  58.531  60.591
+ 60.104  61.243 
+
+Grand mean:     59.74904
+
+
+STATISTICS FOR ESTIMATING G STUDY VARIANCE AND COVARIANCE COMPONENTS
+Note. Diagonal elements are mean squares.
+      Off-diagonal elements are mean products.
+
+Effect         First        Second
+
+p           56.77297
+            31.15119      42.97086
+      
+
+i          135.16901
+            11.98620      97.16865
+      
+
+pi           3.90950
+             1.31741       2.64765
+      
+
+ESTIMATED G STUDY VARIANCE AND COVARIANCE COMPONENTS
+Note. Lower diagonal elements are covariances.
+      Upper diagonal elements are correlations.
+
+Effect         First        Second
+
+p            4.40529       0.64618
+             2.48615       3.36027
+      
+
+i            1.31260
+             0.10669       0.94521
+      
+
+pi           3.90950
+             1.31741       2.64765
+      
+
+
+                           DEFAULT D STUDY FOR RUN 1
+         p x i Design for Rajaratnam, Cronbach, & Gleser (1965) Example
+
+
+SAMPLE SIZE STATISTICS FOR i
+
+      Statistic         First        Second
+
+             ni            12            12
+
+
+ESTIMATED D STUDY VARIANCE AND COVARIANCE COMPONENTS
+Note. Lower diagonal elements are covariances.
+      Upper diagonal elements are correlations.
+
+       Diagonal
+Effect  Divisor         First        Second
+
+p                     4.40529       0.64618
+                      2.48615       3.36027
+      
+
+i        12.000       0.10938
+         12.000       0.00889       0.07877
+      
+
+pi       12.000       0.32579
+         12.000       0.10978       0.22064
+      
+
+UNIVERSE SCORE MATRIX AND ERROR MATRICES
+Note. Lower diagonal elements are covariances.
+      Upper diagonal elements are correlations.
+
+                        First        Second
+
+ Universe Score       4.40529       0.64618
+                      2.48615       3.36027
+               
+
+ Relative Error       0.32579       0.40948
+                      0.10978       0.22064
+               
+
+ Absolute Error       0.43517       0.32877
+                      0.11867       0.29940
+               
+
+ Error for Mean       0.15669       0.26009
+                      0.03485       0.11458
+               
+
+D STUDY RESULTS FOR INDIVIDUAL VARIABLES
+
+                        First        Second
+
+ Univ Score Var       4.40529       3.36027
+  Rel Error Var       0.32579       0.22064
+  Abs Error Var       0.43517       0.29940
+Er Var for Mean       0.15669       0.11458
+
+  Univ Score SD       2.09888       1.83310
+   Rel Error SD       0.57078       0.46972
+   Abs Error SD       0.65968       0.54718
+Err SD for Mean       0.39585       0.33849
+
+Gen Coefficient       0.93114       0.93839
+            Phi       0.91010       0.91819
+
+        S/N-Rel      13.52180      15.22982
+        S/N-Abs      10.12304      11.22315
+
+
+D STUDY RESULTS FOR COMPOSITE
+
+   Variable Wts         First        Second
+
+      w-weights       0.50000       0.50000
+
+-------------------------------------------
+
+          Composite Universe Score Variance       3.18446
+          Composite Relative Error Variance       0.19150
+          Composite Absolute Error Variance       0.24298
+          Composite Error Variance for Mean       0.08524
+
+Composite Universe Score Standard Deviation       1.78451
+Composite Relative Error Standard Deviation       0.43761
+Composite Absolute Error Standard Deviation       0.49293
+Composite Error Standard Deviation for Mean       0.29196
+
+     Composite Generalizability Coefficient       0.94328
+                              Composite Phi       0.92911
+
+                          Composite S/N-Rel      16.62910
+                          Composite S/N-Abs      13.10574
+
+-------------------------------------------
+
+   Contributions to     First        Second    
+
+Comp Univ Score Var    54.10%        45.90%       
+ Comp Rel Error Var    56.86%        43.14%       
+ Comp Abs Error Var    56.98%        43.02%       
+
+
+Date and time at beginning of Run 1:  Tue Nov 22 14:30:51 2016
+Processor time for run: 0 seconds

@@ -113,35 +113,108 @@ cbind(gstudy.res_boot, gstudy.res.CI)
 # Run dstudy
 dstudy(x = gstudy.res, n = list(Dimension = 100, Item_ID = 100), unit = "Person_ID") |> str()
 
-###### --- 
-# Alternative way of mG-theory following Jiang (2022)
-###### ---
-# read.table("https://alabama.box.com/shared/static/9omab5aadtp2ofvkmcqamtv1c2vw8sqq.txt")
-datDummy <- dat |> 
-  fastDummies::dummy_cols(select_columns = "Dimension", remove_first_dummy = FALSE) |> 
-  rename(D1 = Dimension_1, D2 = Dimension_2, D3 = Dimension_3, D4 = Dimension_4)
-glimpse(datDummy)
+
+## Using RCG example -----
 
 ###### --- 
-# G-theory
+# Alternative way of mG-theory following Jiang (2022)
+# Refer to Brennan (2001a, Chap. 9)
 ###### ---
-m1_GT <- as.formula("Score ~ D2+D3+D4+(1 | Person_ID) +  ( 1 | Item_ID) ")
-suppressWarnings(m1_GT_fit <- lmer(m1_GT, datDummy))
+# read.table("https://alabama.box.com/shared/static/9omab5aadtp2ofvkmcqamtv1c2vw8sqq.txt")
+rm(list = ls())
+data("Rajaratnam.2")
+library(dplyr)
+
+dat <- Rajaratnam.2 |> 
+  arrange(Person, Subtest, Item)
+head(dat)
+tail(dat, 10)
+
+cov_component <- function(obj, source, mat_type = "us") {
+  res = VarCorr(obj)
+  if (mat_type == "diag") {
+    attr(res$cond[[source]], "stddev")^2
+  }else if(mat_type == "us"){
+    sd_facet  <- attr(res$cond[[source]], "stddev")
+    cor_facet <- attr(res$cond[[source]], "correlation")
+    cov_facet <- diag(sd_facet)%*%cor_facet%*%diag(sd_facet)
+    cov_facet
+  }
+}
+
+###### --- 
+# lmer method
+###### ---
+m1_GT <- as.formula("Score~ Subtest + (0+Subtest|Person) + (0+Subtest|Item)")
+suppressWarnings(m1_GT_fit <- lmer(m1_GT, dat))
 m1_GT_fit
-summary(m1_GT_fit)$coefficients$cond
+
+datlmer = dat
+datlmer$Residual = residuals(m1_GT_fit)
+m2_GT <- as.formula("Score~Subtest+(Subtest|Person)+(Subtest|Item)+(Subtest|Residual)")
+suppressWarnings(m2_GT_fit <- lmer(m2_GT, datlmer))
+m2_GT_fit
 
 ###### --- 
 # mG-theory
 ###### ---
-m1_mGT <- as.formula("Score ~ D2+D3+D4+us(0+D1+D2+D3+D4| Person_ID) +  us( 0+D1+D2+D3+D4 | Item_ID) ")
-suppressWarnings(m1_mGT_fit <- glmmTMB::glmmTMB(m1_mGT, datDummy, family = gaussian, dispformula =~0))
+m1_mGT <- as.formula("Score~ Subtest + us(0+Subtest|Person) + diag(0+Subtest|Item)")
+suppressWarnings(m1_mGT_fit <- glmmTMB::glmmTMB(m1_mGT, dat, family = gaussian, dispformula =~0))
 m1_mGT_fit
-gstudy(m1_mGT_fit)
+
+cov_component(obj = m1_mGT_fit, source = "Person", mat_type = "us")
+cov_component(obj = m1_mGT_fit, source = "Item", mat_type = "us")
 
 # fixed estimates
-extractFixedCoefsmG(m1_mGT_fit)
+# extractFixedCoefsmG(m1_mGT_fit)
 
-## G-study bootstrap
+## extract residual var-cov matrix
+# residuals_Person <- dat |> 
+#   mutate(Score = residuals(m1_mGT_fit, "response")) %>% 
+#   pivot_wider(names_from = Subtest, values_from = Score, names_prefix = "facet") %>% 
+#   ungroup()
+# 
+# residual_cor = cor(dplyr::select(residuals_Person, starts_with("facet")), use = "pairwise.complete.obs")
+# residual_cov = cov(dplyr::select(residuals_Person, starts_with("facet")), use = "pairwise.complete.obs")
+# residual_cor
+# residual_cov
+
+### second run  -------------------------------------------------------------
+dat2 = dat
+dat2$Residual = residuals(m1_mGT_fit)
+glimpse(dat2)
+m2_mGT <- as.formula("Score~0+Subtest+us(Subtest+0|Person)+diag(Subtest+0|Item)+diag(Subtest+0|Residual)")
+suppressWarnings(m2_mGT_fit <- glmmTMB::glmmTMB(m2_mGT, dat2, family = gaussian, dispformula =~0))
+m2_mGT_fit
+res <- lme4::VarCorr(m2_mGT_fit)
+res
+
+## residual
+var_residual <-
+  cov_component(obj = m2_mGT_fit,
+                source = "Residual",
+                mat_type = "diag")
+
+## item
+var_item <-
+  cov_component(obj = m2_mGT_fit,
+                source = "Item",
+                mat_type = "diag")
+
+## person
+cov_person <-
+  cov_component(obj = m2_mGT_fit,
+                source = "Person",
+                mat_type = "us")
+
+list(
+  Person = round(cov_person, 3),
+  Item = round(var_item, 3),
+  Residual = round(var_residual, 3)
+)
+  
+
+## not work: G-study bootstrap
 gstudy.forboot(m1_mGT_fit)
 boot.gstudy <-
   lme4::bootMer(
