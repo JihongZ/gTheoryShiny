@@ -366,17 +366,54 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
                              var2 = NA, vcov = ss^2, sdcor = ss), deparse.level = 0)
   }
   rownames(r) <- NULL
-  r$sdcor[r$sdcor == 0] = residCor[lower.tri(residCor)]
+  
+  r[r$sdcor == 0 & r$grp == "Residual", ]["sdcor"] = residCor[lower.tri(residCor)]
+  
+  ## function to convert triangle matrix into correlation matrix
+  toCorrCovTbl <- function(dat, facet = "Subtest") {
+    dat_cor = dat_cov = dat
+    cor_mat <- as.matrix(select(dat, starts_with("Subtest")))
+    if( any(is.na(cor_mat[lower.tri(cor_mat)])) ) {
+      cor_mat[lower.tri(cor_mat)] <- cor_mat[upper.tri(cor_mat)]
+    }else if (any(is.na(cor_mat[upper.tri(cor_mat)])) ) {
+      cor_mat[upper.tri(cor_mat)] <- cor_mat[lower.tri(cor_mat)]
+    }else{
+      cor_mat
+    }
+    
+    dat_cor[, str_detect(colnames(dat_cor), "Subtest")] <- cor_mat
+    
+    cor2cov <- function(R, S) { # 
+      sweep(sweep(R, 1, S, "*"), 2, S, "*")
+    }
+    
+    ## correlation matrix
+    R_mat = cor_mat
+    diag(R_mat) = 1
+    dat_cov[, str_detect(colnames(dat_cov), "Subtest")] <- cor2cov(R = R_mat, S = diag(cor_mat))
+    
+    # return
+    list(
+      cor_mat = dat_cor,
+      cov_mat = dat_cov
+    )
+  }
+  
+  
   
   ## adjust table
   resTable <- r |> 
-    mutate(var2 = ifelse(is.na(var2), "Std.Dev", var2)) |> 
+    mutate(var2 = ifelse(is.na(var2), var1, var2)) |> 
     pivot_wider(names_from = var2, values_from = sdcor) |> 
-    mutate(Est.Variance = Std.Dev^2) |> 
-    dplyr::select(-Std.Dev) |> 
-    rename(Source = grp, Fixed.Facet = var1) |> 
-    relocate(Source, Fixed.Facet, Est.Variance)
-  resTable
+    group_split(grp)  
+    
+  list(
+    resTable_cor = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x)$cor_mat)) |> 
+      rename(Source = grp, Fixed.Facet = var1),
+    resTable_cov = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x)$cov_mat)) |> 
+      rename(Source = grp, Fixed.Facet = var1)
+  )
+  
 }
 
 

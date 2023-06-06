@@ -30,8 +30,10 @@ data("Brennan.3.2", package = "gtheory")
 # UI ----------------------------------------------------------------------
 ui <- dashboardPage(
   skin = "purple",
+  
   ## title
   dashboardHeader(title = "GtheoryShiny App"),
+  
   ## Sidebar content -----
   dashboardSidebar(
     sidebarMenu(
@@ -45,6 +47,7 @@ ui <- dashboardPage(
       menuItem("Data Analysis", tabName = "dataanalysis", icon = icon("list-alt"))
     )
   ),
+  
   ## Body content -----
   dashboardBody(
     tabItems(
@@ -629,60 +632,74 @@ server <- function(input, output, session) {
   ### 分支2.1: 若是univariate gtheory （input$mGtheory == FALSE）
   ### 分支2.2: 若是multivariate gtheory （input$mGtheory == TRUE）
   #------------#
-
-   gtheoryFormula <- eventReactive(input$variableSettingConfirm, {
-     formularFacets <- NULL # placeholder for formular
-     nestedStrcTable <- nestedStrc() # load nested structure
-     selectedOutcome <- selectedOutcome() # user-defined DV
-     selectedFacet <- selectedFacet() # user-defined facet(s)
-     selectedCovariates <- selectedCovariates() # user-defined covariates
-     selectedID <- selectedID()
-
-     if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
-
-       formularText <- glue::glue("{selectedOutcome} ~ (1 |{selectedID}) + (1 |{selectedFacet})")
-
-     }else if (ncol(nestedStrcTable) > 1) { # 分支2:multiple facets
-       if (input$mGtheory == FALSE) { # 分支2.1: univariate gtheory
-         for (r in 1:nrow(nestedStrcTable)) { # loop over each row
-           if (nestedStrcTable[r, "NestedorCrossed"] == "Crossed") {
-             formularFacets <- c(formularFacets, 
-                                 glue::glue("(1 | {nestedStrcTable[r, 1:2]})"))
-           }
-           if (nestedStrcTable[r, "NestedorCrossed"] == "Nested") {
-             tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
-             nested <- !any(apply(tab, 1, \(x) sum(x != 0) > 1))
-             if (nested) {
-               formularFacets <-
-                 c(
-                   formularFacets,
-                   glue::glue("(1 | {nestedStrcTable[r, 1]})"),
-                   glue::glue("(1 | {nestedStrcTable[r, 2]}:{nestedStrcTable[r, 1]})")
-                  )
-             } else{
-               formularFacets <-
-                 c(formularFacets,
-                   glue::glue("(1 | {nestedStrcTable[r, 2]})"),
-                   glue::glue("(1 | {nestedStrcTable[r, 1]}:{nestedStrcTable[r, 2]})")
-                  )
-             }
-           }
-         }
-         ## add covariates and facets into the formulate
-         formularText <- paste0(c(selectedCovariates, unique(formularFacets)), collapse = " + ")
-         formularText <- glue::glue("{selectedOutcome} ~ {formularText}")
-         formularText
-       }else{ # 分支2.2: multivariate gtheory
-         fixedfacet <- selectedFixedFacet()
-         randomfacets <- c(selectedID, setdiff(selectedFacet, fixedfacet))
-         formularRHS <- paste0(glue::glue("us({fixedfacet} + 0 | {randomfacets})"), collapse = " + ")
-         formularText <- paste0(selectedOutcome, " ~ ", formularRHS)
-         formularText
-       }
-     }else{
-       NULL
-     }
-   })
+  
+  gtheoryFormula <- eventReactive(input$variableSettingConfirm, {
+    formularFacets <- NULL # placeholder for formular
+    nestedStrcTable <- nestedStrc() # load nested structure
+    selectedOutcome <- selectedOutcome() # user-defined DV
+    selectedFacet <- selectedFacet() # user-defined facet(s)
+    selectedCovariates <- selectedCovariates() # user-defined covariates
+    selectedID <- selectedID()
+    
+    if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
+      
+      formularText <- glue::glue("{selectedOutcome} ~ (1 |{selectedID}) + (1 |{selectedFacet})")
+      
+    }else if (ncol(nestedStrcTable) > 1) { # 分支2:multiple facets
+      if (input$mGtheory == FALSE) { # 分支2.1: univariate gtheory
+        for (r in 1:nrow(nestedStrcTable)) { # loop over each row
+          if (nestedStrcTable[r, "NestedorCrossed"] == "Crossed") {
+            formularFacets <- c(formularFacets, 
+                                glue::glue("(1 | {nestedStrcTable[r, 1:2]})"))
+          }
+          if (nestedStrcTable[r, "NestedorCrossed"] == "Nested") {
+            tab <- table(nestedStrcTable[r, 1], nestedStrcTable[r, 2])
+            nested <- !any(apply(tab, 1, \(x) sum(x != 0) > 1))
+            if (nested) {
+              formularFacets <-
+                c(
+                  formularFacets,
+                  glue::glue("(1 | {nestedStrcTable[r, 1]})"),
+                  glue::glue("(1 | {nestedStrcTable[r, 2]}:{nestedStrcTable[r, 1]})")
+                )
+            } else{
+              formularFacets <-
+                c(formularFacets,
+                  glue::glue("(1 | {nestedStrcTable[r, 2]})"),
+                  glue::glue("(1 | {nestedStrcTable[r, 1]}:{nestedStrcTable[r, 2]})")
+                )
+            }
+          }
+        }
+        ## add covariates and facets into the formulate
+        formularText <- paste0(c(selectedCovariates, unique(formularFacets)), collapse = " + ")
+        formularText <- glue::glue("{selectedOutcome} ~ {formularText}")
+        formularText
+      }else{ # 分支2.2: multivariate gtheory
+        fixedfacet <- selectedFixedFacet()
+        facetWithUSComponent <- selectedFacetWithUSComponent()
+        facetWithDiagComponent <- setdiff(c(selectedID(), selectedFacet()), 
+                                          c(selectedFixedFacet(), selectedFacetWithUSComponent()))
+        
+        if (is.na(facetWithUSComponent)) { # if only facets with diag 
+          formularRHS <- paste0(glue::glue("diag({fixedfacet} + 0 | {facetWithDiagComponent})"), 
+                                collapse = " + ")
+        }else if(is.na(facetWithDiagComponent)){ # if only facet with cov-covariance
+          formularRHS <- paste0(glue::glue("us({fixedfacet} + 0 | {facetWithUSComponent})"), 
+                                collapse = " + ")
+        }else{
+          formularRHS <- paste0(c(glue::glue("us({fixedfacet} + 0 | {facetWithUSComponent})"), 
+                                glue::glue("diag({fixedfacet} + 0 | {facetWithDiagComponent})")), 
+                                collapse = " + ")
+        }
+        
+        formularText <- paste0(selectedOutcome, " ~ ", formularRHS)
+        formularText
+      }
+    }else{
+      NULL
+    }
+  })
 
    ### Output simplified fomular text ----------------------------------------
    output$recommFormular <- renderText({
@@ -805,7 +822,8 @@ server <- function(input, output, session) {
         
         # Extract useful information
         res <- lme4::VarCorr(lmmFit)
-        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)
+        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)$resTable_cor
+        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)$resTable_cov
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
@@ -821,7 +839,7 @@ server <- function(input, output, session) {
         list(
           lmmFit = lmmFit,
           fixedEffect = fixedEffectEstimate,
-          VarComp = resVarCor,
+          VarComp = resVarCov,
           g_coef = g_coef # return a mgStudy class
         )
         
