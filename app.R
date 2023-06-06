@@ -126,12 +126,13 @@ ui <- dashboardPage(
               # show selection area for covariates
               hr(),
               uiOutput("selectedCovariates"),
+              hr(),
               uiOutput("mGtheory"),
               conditionalPanel(
                 condition = "input.mGtheory == 1",
                 uiOutput("selectedFixedFacet"),
-                uiOutput("selectedFacetWithDiagonalComponent"), # facet with diagonal components
-                uiOutput("selectedFacetWithUSComponent") # facet with unstructured components
+                uiOutput("selectedFacetWithUSComponent"), # facet with unstructured components
+                verbatimTextOutput("reportFacets"),
               ),
               actionBttn("variableSettingConfirm", "Confirm", 
                          icon = icon("circle"), style = "jelly", color = "primary", size = "sm")
@@ -176,10 +177,10 @@ ui <- dashboardPage(
             box(title = "Gstudy Estimation", status = "info", solidHeader = TRUE, width = NULL,
                 actionBttn("runGstudyButton", "Run Gstudy", style = "material-flat",
                            color = "primary", size = "sm", icon = icon('circle-play')),
-                br(), br(),
+                br(), 
                 actionBttn("runGstudyBootButton", "Run Bootstrap", style = "material-flat", 
                            color = "primary", size = "sm", icon = icon("bootstrap")),
-                br(), br(),
+                br(), 
                 progressBar(
                   id = "gstudybar",
                   value = 0,
@@ -189,12 +190,12 @@ ui <- dashboardPage(
                   display_pct = TRUE
                 ),
                 ### 下载按钮
-                br(), br(),
+                br(),
                 conditionalPanel(
                   condition = "input.runGstudyButton >=1",
                   downloadButton("downloadGstudyTheta", "Factor Score Table")
                 ),
-                br(), br(),
+                br(), 
                 conditionalPanel(
                   condition = "input.runGstudyBootButton >=1",
                   downloadButton("downloadGstudyBootResult", "Bootstrapping Result")
@@ -428,12 +429,6 @@ server <- function(input, output, session) {
       inputId = "dataConfirm",
       icon = icon("check")
     )
-    
-    # updateTabsetPanel(
-    #   session,
-    #   inputId = "sidebar",
-    #   selected = "datastructure"
-    # )
   })
   
   observeEvent(input$transform, {
@@ -513,36 +508,49 @@ server <- function(input, output, session) {
       )
     })
     
-    # mgTheory选择 facet with diagonal var-cov matrix
-    output$selectedFacetWithDiagonalComponent <- renderUI({
-      random_facets <- c(unit(), setdiff(selectedFacet(), input$selectedFixedFacet))
-      pickerInput(
-        "selectedFacetWithDiagonalComponent",
-        "6. Select fixed facet with diagnonal component:",
+    # mgTheory选择 facet with unstructured var-cov matrix
+    output$selectedFacetWithUSComponent <- renderUI({
+      # all random facets except fixed facet
+      all_facets = c(selectedID(), selectedFacet())
+      random_facets <- setdiff(all_facets, input$selectedFixedFacet)
+      checkboxGroupButtons(
+        "selectedFacetWithUSComponent",
+        label = "6. Select facet(s) with covariances to be estimated:",
         choices = random_facets,
-        selected = random_facets[1],
-        multiple = TRUE
+        selected = random_facets,
+        status = "success",
+        checkIcon = list(
+          no = icon("circle"),
+          yes = icon("check")
+        )
       )
     })
     
-    # mgTheory选择 facet with unstructured var-cov matrix
-    observeEvent(input$selectedFacetWithDiagonalComponent, {
-      output$selectedFacetWithUSComponent <- renderUI({
-        left_facets <- setdiff(c(unit(), selectedFacet()), 
-                               c(input$selectedFixedFacet, 
-                               input$selectedFacetWithDiagonalComponent))
-        pickerInput(
-          "selectedFixedFacet",
-          "7. Select fixed facet with full component:",
-          choices = left_facets,
-          selected = left_facets[1],
-          multiple = TRUE
-        )
-      })
+    output$reportFacets <- renderText({
+      facets_cov_text <- paste0(selectedFacetWithUSComponent(), collapse = "; ")
+        
+      facets_var_text <- paste0(setdiff(c(selectedID(), selectedFacet()), 
+                                        c(selectedFixedFacet(), selectedFacetWithUSComponent())), 
+                                collapse = "; ")
+        
+      glue::glue("ID: {selectedID()};\n
+                 Outcome: {selectedOutcome()};\n
+                 Fixed Facet: {selectedFixedFacet()};\n
+                 Random Facet with covariances estimated: {facets_cov_text}; \n
+                 Random Facet with only variances estimated: {facets_var_text}; \n
+                 ")
     })
-    
-    
   })
+  
+  ### Reactive facets / outcomes / ID ----------------------------------------
+  selectedID = reactive({input$selectedID}) ## ID
+  selectedOutcome = reactive({input$selectedOutcome}) ## Outcome (i.e., Score)
+  selectedFacet = reactive({input$selectedMultipleFacets}) ## Facets used for gstudy/dstudy
+  selectedCovariates = reactive({input$selectedCovariates}) ## covariates for fixed effects
+  selectedMissingMethod = reactive({input$missingMethod}) ## selected missing data handling method
+  ## mGtheory
+  selectedFixedFacet = reactive({input$selectedFixedFacet}) ## mgtheory: fixed facet
+  selectedFacetWithUSComponent = reactive({input$selectedFacetWithUSComponent})
   
 
   ## missing data inputation
@@ -571,19 +579,10 @@ server <- function(input, output, session) {
     dat
   })
   
-  
-  ### Setting: user-selected facets / outcomes / ID ----------------------------------------
-  unit = reactive({input$selectedID}) ## ID
-  selectedOutcome = reactive({input$selectedOutcome}) ## Outcome (i.e., Score)
-  selectedFacet = reactive({input$selectedMultipleFacets}) ## Facets used for gstudy/dstudy
-  selectedCovariates = reactive({input$selectedCovariates}) ## covariates for fixed effects
-  selectedFixedFacet = reactive({input$selectedFixedFacet}) ## mgtheory: fixed facet
-  selectedMissingMethod = reactive({input$missingMethod}) ## selected missing data handling method
-  
   ### nestedStrc: automatically detect design of data and return structure table-----
   nestedStrc <- eventReactive(input$variableSettingConfirm, {
     dat <- datNARemoved()
-    selectedFacet <- c(selectedFacet(), unit()) # facets and ID
+    selectedFacet <- c(selectedFacet(), selectedID()) # facets and ID
     
     if (length(selectedFacet) == 1) { # if single facet
       nestedStrc = data.frame(NA)
@@ -625,7 +624,7 @@ server <- function(input, output, session) {
   #------------#
   # 若點擊確認(confirm)按鈕，根據design structure進行逐行掃描:
   ## 分支1: 若design structure為單列，則為single facet。進行下列操作:
-  ##        1, 生成selectedOutcome() ~ (1 | unit()) + (1 | selectedFacet())
+  ##        1, 生成selectedOutcome() ~ (1 | selectedID()) + (1 | selectedFacet())
   ## 分支2: 若design structure為多列，則為multiple facets。
   ### 分支2.1: 若是univariate gtheory （input$mGtheory == FALSE）
   ### 分支2.2: 若是multivariate gtheory （input$mGtheory == TRUE）
@@ -637,7 +636,7 @@ server <- function(input, output, session) {
      selectedOutcome <- selectedOutcome() # user-defined DV
      selectedFacet <- selectedFacet() # user-defined facet(s)
      selectedCovariates <- selectedCovariates() # user-defined covariates
-     selectedID <- unit()
+     selectedID <- selectedID()
 
      if (ncol(nestedStrcTable) == 1) { # 分支1:single facet
 
@@ -783,7 +782,7 @@ server <- function(input, output, session) {
         )
         ## extract residual var-cov matrix
         residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
-                                  datG[c(unit(), selectedFacet())]) %>%
+                                  datG[c(selectedID(), selectedFacet())]) %>%
           pivot_wider(names_from = selectedFixedFacet(), 
                       values_from = residuals, names_prefix = "facet") %>%
           ungroup()
@@ -799,7 +798,7 @@ server <- function(input, output, session) {
         formulaRecommWtResid <- as.formula(formulaWtResidTxt)
         lmmFit <- glmmTMB::glmmTMB(
           formula = formulaRecommWtResid,
-          data =  dat2,
+          data = dat2,
           family = linkFunc,
           dispformula =~0
         )
@@ -811,11 +810,11 @@ server <- function(input, output, session) {
         
         ## generalizability coefficient
         g_coef <- gCoef_mGTheory(
-          dat = datG[c(unit(), selectedFacet())],
+          dat = datG[c(selectedID(), selectedFacet())],
           nDimension = n_distinct(datG[selectedFixedFacet()]),
           glmmTMBObj = lmmFit,
           residual_cov = residual_cov,
-          person_ID = unit()
+          person_ID = selectedID()
         )
         
         
@@ -823,7 +822,7 @@ server <- function(input, output, session) {
           lmmFit = lmmFit,
           fixedEffect = fixedEffectEstimate,
           VarComp = resVarCor,
-          g_coef = g_coef # retrun a mgstudy class
+          g_coef = g_coef # return a mgStudy class
         )
         
       } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
@@ -1030,10 +1029,10 @@ server <- function(input, output, session) {
     if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
       ## gstudy results
       gstudy_res <- gstudyResult()$gstudy
-      dstudy_res = dstudy(x = gstudy_res, n = updatedN, unit = unit())
+      dstudy_res = dstudy(x = gstudy_res, n = updatedN, unit = selectedID())
     }else{# 分支2: 若為multivariate gstudy,运行mdstudy
       mgstudy_res <- gstudyResult()$mgstudy
-      dstudy_res = mdstudy(x = mgstudy_res, n = updatedN, unit = unit())
+      dstudy_res = mdstudy(x = mgstudy_res, n = updatedN, unit = selectedID())
     }
     
     dstudy_res
@@ -1058,7 +1057,7 @@ server <- function(input, output, session) {
                       title = "In progress: 30%")
     for (i in 1:input$nboot) {
       gstudy_res$gstudy.out[, 2] <- t(boot_gstudy_res$t)[, i]
-      temp.dstudy <- dstudy.forboot(x = gstudy_res, n = updatedN, unit = unit())
+      temp.dstudy <- dstudy.forboot(x = gstudy_res, n = updatedN, unit = selectedID())
       
       boot_dstudy <- rbind(
         boot_dstudy,
@@ -1141,7 +1140,7 @@ server <- function(input, output, session) {
       # loop over each level
       for (i in 1:length(facetLevels)) {
         updatedNrange[selectedFacetForDstudy()] = facetLevels[i]
-        dstudy.res <- dstudy(x = gstudy_res, n = updatedNrange, unit = unit())
+        dstudy.res <- dstudy(x = gstudy_res, n = updatedNrange, unit = selectedID())
         gcoefs[i] <- dstudy.res[["gcoef"]]
         dcoefs[i] <- dstudy.res[["dcoef"]]
       }
