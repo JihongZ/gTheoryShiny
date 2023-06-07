@@ -104,7 +104,18 @@ ui <- dashboardPage(
           tabBox(title = tagList(shiny::icon("th"), "Data"), 
             width = 8, id = "tabsetData", 
             tabPanel(title = "Raw", DTOutput("rawDataTable")),
-            tabPanel(title = "Transformed", DTOutput("transDataTable"))
+            tabPanel(title = "Transformed", 
+                     DTOutput("transDataTable"),
+                     ## 下載轉化過的數據
+                     conditionalPanel(
+                       condition = "input.transform >= 1",
+                       br(),
+                       downloadBttn("downloadTransData", 
+                                    "Download", 
+                                    style = "jelly",
+                                    color = "success", size = "sm"),
+                     )
+            )
           ),
         )
       ),
@@ -197,12 +208,15 @@ ui <- dashboardPage(
                 br(),
                 conditionalPanel(
                   condition = "input.runGstudyButton >=1",
-                  downloadButton("downloadGstudyTheta", "Factor Score Table")
+                  downloadBttn("downloadGstudyTheta", "Factor Score Table",
+                               style = "jelly", color = "success")
                 ),
                 br(), 
                 conditionalPanel(
                   condition = "input.runGstudyBootButton >=1",
-                  downloadButton("downloadGstudyBootResult", "Bootstrapping Result")
+                  downloadBttn("downloadGstudyBootResult", 
+                                 "Bootstrapping Result",
+                                 style = "jelly", color = "success")
                 )
             ),
             
@@ -235,8 +249,13 @@ ui <- dashboardPage(
                   ### 下载按钮dstudy
                   conditionalPanel(
                     condition = "input.runDstudyButton >=1",
-                    downloadButton("downloadDstudyResult", "Download dstudy result"),
-                    downloadButton("downloadDstudyBootResult", "Download bootstrap result")
+                    downloadBttn("downloadDstudyResult", 
+                                 "Download dstudy result",
+                                 color = "success", style = "jelly"
+                                   ),
+                    downloadBttn("downloadDstudyBootResult", 
+                                 "Download bootstrap result",
+                                 color = "success", style = "jelly")
                   )
                 )
             )
@@ -341,6 +360,9 @@ server <- function(input, output, session) {
   ## preFixText: tag的前綴是什麼比如第四個item—I4，為I
   ## TagNamesText: facet的name比如：Class;Rater;Item
   #------------#
+  
+  
+  ### Reactive facets and prefix -----
   NText = reactive({input$nRows}) # 有多少行是tag/ID
   preFixText = reactive({input$TagPreFix}) # 前缀，比如A;B;C
   TagNamesText = reactive({input$TagNames}) # facet的name比如：Class;Rater;Item
@@ -361,10 +383,13 @@ server <- function(input, output, session) {
       number_rows_facets = NText()
       number_rows_facets <- max(1, number_rows_facets)
       
+      dat <- datRaw()
+      prefix = apply(dat[1:max(1, NText()),-1], 1, \(x) str_remove(x, "[0-9]+")[1])
+      
       output$preFixText <- renderUI({ # 为facets选择prefix
         textInput("TagPreFix", 
                   label = "Enter prefix of facet levels seperated by `,`（for example, `O,I`)" , 
-                  value = paste0(LETTERS[1:number_rows_facets], collapse = ","))
+                  value = paste0(prefix, collapse = ","))
       })
       
       output$TagNamesText <- renderUI({
@@ -393,6 +418,7 @@ server <- function(input, output, session) {
     if (preFixText() != "" & TagNamesText() != "") { #分支1.如果preFixText和TagNames都提供
       TagPreFix <- str_split(preFixText(), ",")[[1]]
       TagNames <- str_split(TagNamesText(), ",")[[1]]
+      
       if (N == 0) { # 分支1.1：如果没有facet行，默认facet藏在heading里且为single facet,将PreFix开头的转化为long，冠以TagNames
         if (length(TagPreFix) > 1) {
           shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
@@ -402,6 +428,7 @@ server <- function(input, output, session) {
         }
         datTrans <- dplyr::tibble(dat) |>
           pivot_longer(starts_with({{TagPreFix}}), names_to = TagNames, values_to = "Score")
+        
       }else if (N > 0){ # 分支1.2:如果有facet行，将tags of facet转换为合并的ID再进行long-format转化
         tags = dat[1:N, -1] # 取出levels名字
         # 将所有facets合并成特殊ID
@@ -410,7 +437,9 @@ server <- function(input, output, session) {
         colnames(dat_FacetNameOmitted) <- c("Person", mergedID)
         datTrans <- dat_FacetNameOmitted |>
           pivot_longer(cols = any_of(as.character(mergedID)), values_to = "Score") |>
+          mutate(name = str_remove_all(name, pattern = paste0("[",paste0(TagPreFix, collapse = "|"), "]") )) |> 
           separate(name, into = TagNames, sep = "_")
+        
       }
     }else if (preFixText() == "" & TagNamesText() == "" & N == 0){
       datTrans <- dplyr::tibble(dat) |>
@@ -424,7 +453,15 @@ server <- function(input, output, session) {
   })
 
   ### Output transformed data table if any -----
-  output$transDataTable <- renderDT({datatable(datTrans()) %>% formatRound('Score', 2)})
+  output$transDataTable <- renderDT({
+    datatable(datTrans()) %>% formatRound('Score', 2)})
+  
+  output$downloadTransData <- downloadHandler(
+    filename = "transformed.csv",
+    content = \(file) {
+      write.csv(datTrans(), file, row.names = FALSE)
+    }
+  )
 
   ### Update UI for data confirm and switch to Tab page 2 -----
   observeEvent(input$dataConfirm, {
@@ -769,6 +806,7 @@ server <- function(input, output, session) {
     }
     
     if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
+      ####  glmer function ----------------------------------------
       if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
         formulaRecomm <- as.formula(gtheoryFormula())
         lmmFit <- glmer(data = datG, formula = formulaRecomm, family = linkFunc)
@@ -791,8 +829,8 @@ server <- function(input, output, session) {
       )
       
     }else{# 分支2: 若為multivariate gstudy
+      ### mGtheory estimtion ----------------------------------------
       facets_US <- selectedFacetWithUSComponent()
-      #### mGtheory estimtion --------
       if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
         formulaTxt <- gtheoryFormula()
         formulaRecomm <- as.formula(formulaTxt)
@@ -806,14 +844,17 @@ server <- function(input, output, session) {
         residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
                                   datG[c(selectedID(), selectedFacet())]) %>%
           pivot_wider(names_from = selectedFixedFacet(), 
-                      values_from = residuals, names_prefix = "facet") %>%
+                      values_from = residuals, 
+                      names_prefix = "facet") %>%
           ungroup()
         residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")),
                            use = "pairwise.complete.obs")
         residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")),
                            use = "pairwise.complete.obs")
         
-        ## run second time
+        ###### --- 
+        # run second time
+        ###### ---
         dat2 = datG
         dat2$Residual = residuals(lmmFit, "response")
         
@@ -831,11 +872,14 @@ server <- function(input, output, session) {
           dispformula =~0
         )
         
-        
         # Extract useful information
         res <- lme4::VarCorr(lmmFit)
-        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor, facetName = selectedFixedFacet())$resTable_cor
-        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor, facetName = selectedFixedFacet())$resTable_cov
+        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, 
+                                             residCor = residual_cor, 
+                                             facetName = selectedFixedFacet())$resTable_cor
+        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, 
+                                             residCor = residual_cor, 
+                                             facetName = selectedFixedFacet())$resTable_cov
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
@@ -847,7 +891,9 @@ server <- function(input, output, session) {
           person_ID = selectedID()
         )
         
-        
+        ###### --- 
+        # Return values
+        ###### ---
         list(
           lmmFit = lmmFit,
           fixedEffect = fixedEffectEstimate,
