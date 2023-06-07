@@ -922,7 +922,8 @@ server <- function(input, output, session) {
   ### Output gstudy results and bootstrapping  ----------------------------------------
   output$recommModelFixedEffectResult <- renderDT(round(gstudyResult()$fixedEffect, 3))
   output$GstudyResultPrint <- renderDT({
-    res <- gstudyResult()$VarComp
+    res <- gstudyResult()$VarComp |> 
+      mutate(across(everything(), \(x) ifelse(x == 0, NA, x)))
     datatable(res) |> 
       formatRound(colnames(res)[sapply(res, is.numeric)], digits = 3)
   })
