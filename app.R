@@ -27,6 +27,7 @@ source("modules/LongToWide_module.R") # Long format to Wide format
 ## Load example data
 data("Rajaratnam.2", package = "gtheory")
 data("Brennan.3.2", package = "gtheory")
+
 # UI ----------------------------------------------------------------------
 ui <- dashboardPage(
   skin = "purple",
@@ -406,7 +407,7 @@ server <- function(input, output, session) {
         # 将所有facets合并成特殊ID
         mergedID = apply(tags, 2, \(x) paste0(x, collapse = "_"))
         dat_FacetNameOmitted <- dplyr::tibble(dat[-(1:N), ]) # 去掉了facet信息的纯数据
-        colnames(dat_FacetNameOmitted) <- c("ID", mergedID)
+        colnames(dat_FacetNameOmitted) <- c("Person", mergedID)
         datTrans <- dat_FacetNameOmitted |>
           pivot_longer(cols = any_of(as.character(mergedID)), values_to = "Score") |>
           separate(name, into = TagNames, sep = "_")
@@ -519,7 +520,7 @@ server <- function(input, output, session) {
       checkboxGroupButtons(
         "selectedFacetWithUSComponent",
         label = "6. Select facet(s) with covariances to be estimated:",
-        choices = random_facets,
+        choices = c(random_facets, "Residual"),
         selected = random_facets,
         status = "success",
         checkIcon = list(
@@ -531,7 +532,6 @@ server <- function(input, output, session) {
     
     output$reportFacets <- renderText({
       facets_cov_text <- paste0(selectedFacetWithUSComponent(), collapse = "; ")
-        
       facets_var_text <- paste0(setdiff(c(selectedID(), selectedFacet()), 
                                         c(selectedFixedFacet(), selectedFacetWithUSComponent())), 
                                 collapse = "; ")
@@ -677,24 +677,27 @@ server <- function(input, output, session) {
         formularText
       }else{ # 分支2.2: multivariate gtheory
         fixedfacet <- selectedFixedFacet()
-        facetWithUSComponent <- selectedFacetWithUSComponent()
+        facetWithUSComponent <- setdiff(selectedFacetWithUSComponent(), "Residual")
         facetWithDiagComponent <- setdiff(c(selectedID(), selectedFacet()), 
                                           c(selectedFixedFacet(), selectedFacetWithUSComponent()))
         
-        if (is.na(facetWithUSComponent)) { # if only facets with diag 
+        if (any(is.na(facetWithUSComponent))) { # if only facets with diag 
           formularRHS <- paste0(glue::glue("diag({fixedfacet} + 0 | {facetWithDiagComponent})"), 
                                 collapse = " + ")
-        }else if(is.na(facetWithDiagComponent)){ # if only facet with cov-covariance
+        }else if(any(is.na(facetWithDiagComponent))){ # if only facet with cov-covariance
           formularRHS <- paste0(glue::glue("us({fixedfacet} + 0 | {facetWithUSComponent})"), 
                                 collapse = " + ")
         }else{
-          formularRHS <- paste0(c(glue::glue("us({fixedfacet} + 0 | {facetWithUSComponent})"), 
-                                glue::glue("diag({fixedfacet} + 0 | {facetWithDiagComponent})")), 
-                                collapse = " + ")
+          formularRHS <- paste0(c(
+            glue::glue("0 + {fixedfacet}"), 
+            glue::glue("us({fixedfacet} + 0 | {facetWithUSComponent})"), 
+            glue::glue("diag({fixedfacet} + 0 | {facetWithDiagComponent})")), 
+            collapse = " + ")
         }
         
         formularText <- paste0(selectedOutcome, " ~ ", formularRHS)
         formularText
+        
       }
     }else{
       NULL
@@ -703,8 +706,8 @@ server <- function(input, output, session) {
 
    ### Output simplified fomular text ----------------------------------------
    output$recommFormular <- renderText({
-     makeeasyformular(gtheoryFormula())
-     #gtheoryFormula()
+     #akeeasyformular(gtheoryFormula())
+     gtheoryFormula()
    })
 
    ### Output data design table ----------------------------------------
@@ -788,6 +791,8 @@ server <- function(input, output, session) {
       )
       
     }else{# 分支2: 若為multivariate gstudy
+      facets_US <- selectedFacetWithUSComponent()
+      #### mGtheory estimtion --------
       if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
         formulaTxt <- gtheoryFormula()
         formulaRecomm <- as.formula(formulaTxt)
@@ -811,7 +816,13 @@ server <- function(input, output, session) {
         ## run second time
         dat2 = datG
         dat2$Residual = residuals(lmmFit, "response")
-        formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
+        
+        if ("Residual" %in% facets_US) {
+          formulaWtResidTxt <- paste0(formulaTxt, "+ us(", selectedFixedFacet(), " + 0 | Residual)")
+        }else{
+          formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
+        }
+        
         formulaRecommWtResid <- as.formula(formulaWtResidTxt)
         lmmFit <- glmmTMB::glmmTMB(
           formula = formulaRecommWtResid,
@@ -820,10 +831,11 @@ server <- function(input, output, session) {
           dispformula =~0
         )
         
+        
         # Extract useful information
         res <- lme4::VarCorr(lmmFit)
-        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)$resTable_cor
-        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor)$resTable_cov
+        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor, facetName = selectedFixedFacet())$resTable_cor
+        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, residCor = residual_cor, facetName = selectedFixedFacet())$resTable_cov
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
@@ -840,6 +852,7 @@ server <- function(input, output, session) {
           lmmFit = lmmFit,
           fixedEffect = fixedEffectEstimate,
           VarComp = resVarCov,
+          mGtheoryFormula = formulaWtResidTxt,
           g_coef = g_coef # return a mgStudy class
         )
         
@@ -915,7 +928,8 @@ server <- function(input, output, session) {
   })
   output$GstudyResultExtraPrint <- renderText({
     if (input$mGtheory == TRUE) {
-      glue::glue("g-coefficient: {gstudyResult()$g_coef}")
+      glue::glue("g-coefficient: {gstudyResult()$g_coef}\n
+                 glmmTMB formula: {gstudyResult()$mGtheoryFormula}")
     }
   })
   output$recommModelGStudyBootResult <- renderDT({

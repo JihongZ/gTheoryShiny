@@ -114,7 +114,7 @@ cbind(gstudy.res_boot, gstudy.res.CI)
 dstudy(x = gstudy.res, n = list(Dimension = 100, Item_ID = 100), unit = "Person_ID") |> str()
 
 
-## Using RCG example -----
+## Using Simulated RCG example -----
 
 ###### --- 
 # Alternative way of mG-theory following Jiang (2022)
@@ -122,22 +122,95 @@ dstudy(x = gstudy.res, n = list(Dimension = 100, Item_ID = 100), unit = "Person_
 ###### ---
 # read.table("https://alabama.box.com/shared/static/9omab5aadtp2ofvkmcqamtv1c2vw8sqq.txt")
 rm(list = ls())
-data("Rajaratnam.2")
-library(dplyr)
 
-dat <- Rajaratnam.2 |> 
-  arrange(Person, Subtest, Item)
+library(dplyr)
+library(gtheory)
+
+#------------#
+# Data simulation
+#------------#
+
+p.effect.cov <- matrix(c(
+  1.5714, 1.4821, 0.5,
+  1.4821, 2.7857, 0.9464,
+  0.5,    0.9464, 1.8571
+), 3 , 3, byrow = TRUE)
+
+i.effect.cov <- matrix(c(
+  0.4286,    0,         0,
+  0,         0.1994,    0,
+  0,         0,         0.4464
+), 3,3, byrow = TRUE)
+
+pi.effect.cov <- matrix(c(
+  0.5714,    0,         0,
+  0,         1.0714,    0,
+  0,         0,         0.4286
+), 3,3, byrow = TRUE)
+
+N.i = 50
+N.p = 100
+N.h = 3
+grand.mean = c(40, 50, 60)
+
+
+# For Person Effect; 100 X 300
+# 100 X 3
+set.seed(221203)
+temp.p <- rmvnorm(N.p, grand.mean, p.effect.cov)
+TEMP.P <- NULL
+for(v in 1:N.h) {
+  for (i in 1:N.i) {
+    TEMP.P <- cbind(TEMP.P, temp.p[, v])
+  }
+}	
+
+#For Item Effect; 100:200
+temp.i <- rmvnorm(N.i, rep(0, N.h), i.effect.cov)
+TEMP.I <- NULL
+for (p in 1:N.p) {
+  TEMP.I.OneRow = NULL
+  for (v in 1:N.h) {
+    TEMP.I.OneRow = c(TEMP.I.OneRow, t(temp.i)[v, ])
+  }
+  TEMP.I <- rbind(TEMP.I,  TEMP.I.OneRow)
+}
+
+#For Error Effect
+temp.e <- rmvnorm(N.p * N.i, rep(0, N.h), pi.effect.cov)
+TEMP.E <- matrix(temp.e, N.p, N.i * N.h)
+Dat1 <- TEMP.P + TEMP.I + TEMP.E
+rownames(Dat1) <- NULL
+
+Dat1 <- Dat1 |>
+  as.data.frame() |> 
+  rownames_to_column("Person")
+
+Dat_out <- rbind(
+    c("Person", rep(paste0("I", 1:N.i), N.h)),
+    c("Person", rep(paste0("V", 1:N.h), each = N.i)),
+    Dat1
+)
+
+write.csv(Dat_out, file = "ExampleCode/Zhehan/RCGI100P100.csv", row.names = FALSE)
+#------------#
+# End
+#------------#
 head(dat)
 tail(dat, 10)
+
+cor2cov <- function(R, S) { # 
+  sweep(sweep(R, 1, S, "*"), 2, S, "*")
+}
 
 cov_component <- function(obj, source, mat_type = "us") {
   res = VarCorr(obj)
   if (mat_type == "diag") {
-    attr(res$cond[[source]], "stddev")^2
+    cor2cov(S = attr(res$cond[[source]], "stddev"), R = diag(1, length(attr(res$cond[[source]], "stddev"))))
   }else if(mat_type == "us"){
     sd_facet  <- attr(res$cond[[source]], "stddev")
     cor_facet <- attr(res$cond[[source]], "correlation")
-    cov_facet <- diag(sd_facet)%*%cor_facet%*%diag(sd_facet)
+    cov_facet <- cor2cov(R = cor_facet, S = sd_facet)
     cov_facet
   }
 }
@@ -145,13 +218,13 @@ cov_component <- function(obj, source, mat_type = "us") {
 ###### --- 
 # lmer method
 ###### ---
-m1_GT <- as.formula("Score~ Subtest + (0+Subtest|Person) + (0+Subtest|Item)")
-suppressWarnings(m1_GT_fit <- lmer(m1_GT, dat))
+m1_GT <- as.formula("Score~0+Subtest + (0+Subtest|Person) + (0+Subtest|Item)")
+suppressWarnings(m1_GT_fit <- lmer(m1_GT, dat, REML = FALSE))
 m1_GT_fit
 
 datlmer = dat
-datlmer$Residual = residuals(m1_GT_fit)
-m2_GT <- as.formula("Score~Subtest+(Subtest|Person)+(Subtest|Item)+(Subtest|Residual)")
+datlmer$pi = residuals(m1_GT_fit)
+m2_GT <- as.formula("Score~0+Subtest+(Subtest|Person)+(Subtest|Item)+(Subtest|pi)")
 suppressWarnings(m2_GT_fit <- lmer(m2_GT, datlmer))
 m2_GT_fit
 
@@ -165,27 +238,14 @@ m1_mGT_fit
 cov_component(obj = m1_mGT_fit, source = "Person", mat_type = "us")
 cov_component(obj = m1_mGT_fit, source = "Item", mat_type = "us")
 
-# fixed estimates
-# extractFixedCoefsmG(m1_mGT_fit)
-
-## extract residual var-cov matrix
-# residuals_Person <- dat |> 
-#   mutate(Score = residuals(m1_mGT_fit, "response")) %>% 
-#   pivot_wider(names_from = Subtest, values_from = Score, names_prefix = "facet") %>% 
-#   ungroup()
-# 
-# residual_cor = cor(dplyr::select(residuals_Person, starts_with("facet")), use = "pairwise.complete.obs")
-# residual_cov = cov(dplyr::select(residuals_Person, starts_with("facet")), use = "pairwise.complete.obs")
-# residual_cor
-# residual_cov
-
 ### second run  -------------------------------------------------------------
 dat2 = dat
 dat2$Residual = residuals(m1_mGT_fit)
 glimpse(dat2)
 m2_mGT <- as.formula("Score~0+Subtest+us(Subtest+0|Person)+diag(Subtest+0|Item)+diag(Subtest+0|Residual)")
-suppressWarnings(m2_mGT_fit <- glmmTMB::glmmTMB(m2_mGT, dat2, family = gaussian, dispformula =~0))
+suppressWarnings(m2_mGT_fit <- glmmTMB::glmmTMB(m2_mGT, dat2, family = gaussian, dispformula =~0, REML = FALSE))
 m2_mGT_fit
+
 res <- lme4::VarCorr(m2_mGT_fit)
 res
 
@@ -194,18 +254,21 @@ var_residual <-
   cov_component(obj = m2_mGT_fit,
                 source = "Residual",
                 mat_type = "diag")
+round(var_residual, 2)
 
 ## item
 var_item <-
   cov_component(obj = m2_mGT_fit,
                 source = "Item",
                 mat_type = "diag")
+round(var_item, 2)
 
 ## person
 cov_person <-
   cov_component(obj = m2_mGT_fit,
                 source = "Person",
                 mat_type = "us")
+round(cov_person, 2)
 
 list(
   Person = round(cov_person, 3),

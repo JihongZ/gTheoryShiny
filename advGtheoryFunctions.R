@@ -335,8 +335,14 @@ makehardformularMGtheory <- function(formular) {
 
 
 # multivariate G-theory functions -----------------------------------------
+cor2cov <- function(R, S) { # 
+  sweep(sweep(R, 1, S, "*"), 2, S, "*")
+}
+
+
 extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE, 
-                                     order = c("cov.last", "lower.tri"), residCor) 
+                                     order = c("cov.last", "lower.tri"), 
+                                     residCor, facetName) 
 {
   order <- match.arg(order)
   tmpf <- function(v, grp) {
@@ -370,9 +376,15 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
   r[r$sdcor == 0 & r$grp == "Residual", ]["sdcor"] = residCor[lower.tri(residCor)]
   
   ## function to convert triangle matrix into correlation matrix
-  toCorrCovTbl <- function(dat, facet = "Subtest") {
+  toCorrCovTbl <- function(dat, facet = facetName) {
+    
+    ## read in variance 
     dat_cor = dat_cov = dat
-    cor_mat <- as.matrix(select(dat, starts_with("Subtest")))
+    
+    ## diagnal: sd, off-diagnal: cor
+    
+    cor_mat <- as.matrix(dat[str_detect(colnames(dat), pattern = facetName)])
+    
     if( any(is.na(cor_mat[lower.tri(cor_mat)])) ) {
       cor_mat[lower.tri(cor_mat)] <- cor_mat[upper.tri(cor_mat)]
     }else if (any(is.na(cor_mat[upper.tri(cor_mat)])) ) {
@@ -381,16 +393,14 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
       cor_mat
     }
     
-    dat_cor[, str_detect(colnames(dat_cor), "Subtest")] <- cor_mat
     
-    cor2cov <- function(R, S) { # 
-      sweep(sweep(R, 1, S, "*"), 2, S, "*")
-    }
+    dat_cor[, str_detect(colnames(dat_cor), facetName)] <- cor_mat
     
-    ## correlation matrix
+
+    ## correlation matrix to covariance matrix
     R_mat = cor_mat
     diag(R_mat) = 1
-    dat_cov[, str_detect(colnames(dat_cov), "Subtest")] <- cor2cov(R = R_mat, S = diag(cor_mat))
+    dat_cov[, str_detect(colnames(dat_cov), facetName)] <- cor2cov(R = R_mat, S = diag(cor_mat))
     
     # return
     list(
@@ -406,11 +416,12 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
     mutate(var2 = ifelse(is.na(var2), var1, var2)) |> 
     pivot_wider(names_from = var2, values_from = sdcor) |> 
     group_split(grp)  
-    
+  
+  
   list(
-    resTable_cor = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x)$cor_mat)) |> 
+    resTable_cor = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x, facet = facetName)$cor_mat)) |> 
       rename(Source = grp, Fixed.Facet = var1),
-    resTable_cov = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x)$cov_mat)) |> 
+    resTable_cov = do.call("rbind", lapply(resTable, \(x) toCorrCovTbl(dat = x, facet = facetName)$cov_mat)) |> 
       rename(Source = grp, Fixed.Facet = var1)
   )
   
