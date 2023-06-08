@@ -27,6 +27,7 @@ source("modules/LongToWide_module.R") # Long format to Wide format
 ## Load example data
 data("Rajaratnam.2", package = "gtheory")
 data("Brennan.3.2", package = "gtheory")
+Brennan.9.3 <- read.csv("https://raw.githubusercontent.com/JihongZ/gTheoryShiny/main/data/Brennan.9.3.csv")
 
 # UI ----------------------------------------------------------------------
 ui <- dashboardPage(
@@ -75,25 +76,25 @@ ui <- dashboardPage(
                 radioGroupButtons(
                   inputId = "selectedExpDat",
                   label = "Example data: ",
-                  choices = c("Rajaratnam.2", "Brennan.3.2"),
+                  choices = c("Rajaratnam.2", "Brennan.3.2", "Brennan.9.3"),
                   direction = "vertical"
                 )
               ),
               conditionalPanel( # if check the switch, let client select self data
                 condition = "input.fileUploadSwitch == 1", 
                 csvFileUI("fileUpload", ""),
-                prettySwitch("isLongFormat", "Long format", value = TRUE, status = "info"),
-                conditionalPanel(
-                  condition = "input.isLongFormat == 0",
-                  hr(),
-                  h4("Pivot data from wide to long: "),
-                  uiOutput("nRowsSelection"),
-                  uiOutput("preFixText"),
-                  uiOutput("TagNamesText"),
-                  ## 转换
-                  actionBttn("transform", tagList(icon("rotate"), "Transform"), 
-                             style = "jelly", color = "primary", size = "sm"),
-                )
+              ),
+              prettySwitch("isLongFormat", "Long format", value = TRUE, status = "info"),
+              conditionalPanel(
+                condition = "input.isLongFormat == 0",
+                hr(),
+                h4("Pivot data from wide to long: "),
+                uiOutput("nRowsSelection"),
+                uiOutput("preFixText"),
+                uiOutput("TagNamesText"),
+                ## 转换
+                actionBttn("transform", tagList(icon("rotate"), "Transform"), 
+                           style = "jelly", color = "primary", size = "sm"),
               ),
               ## 确定
               br(),
@@ -323,13 +324,13 @@ server <- function(input, output, session) {
   
   ### Reactive dat -----
   dat <- eventReactive(input$dataConfirm, {
-    if (input$fileUploadSwitch == 0) { # if use example data
-      dat = get(input$selectedExpDat)
-      dat
-    }else{ # if use user-uploaded data
-      if(input$transform == 1){
-        datTrans()
-      }else{
+    if(input$transform == 1){
+      datTrans()
+    }else{
+      if (input$fileUploadSwitch == 0) { # if use example data
+        dat = get(input$selectedExpDat)
+        dat
+      }else{ # if use user-uploaded data
         datRaw()
       }
     }
@@ -360,12 +361,17 @@ server <- function(input, output, session) {
   TagNamesText = reactive({input$TagNames}) # facet的name比如：Class;Rater;Item
   
   observeEvent(input$isLongFormat, {
+    if (input$fileUploadSwitch == 0) {
+      dat = get(input$selectedExpDat)
+    }else{
+      dat = datRaw()
+    }
     # 按下"transform"按钮后，将原始数据转换为长数据格式:
     output$nRowsSelection <- renderUI({ # 选择多少行代表Facet Tags，每一行代表一个facet
       pickerInput(
         "nRows",
         "Select the number of rows containing facets (not including headings)",
-        choices = 0:nrow(datRaw()),
+        choices = 0:nrow(dat),
         selected = 0
       )
     })
@@ -375,7 +381,6 @@ server <- function(input, output, session) {
       number_rows_facets = NText()
       number_rows_facets <- max(1, number_rows_facets)
       
-      dat <- datRaw()
       prefix = apply(dat[1:max(1, NText()),-1], 1, \(x) str_remove(x, "[0-9]+")[1])
       
       output$preFixText <- renderUI({ # 为facets选择prefix
@@ -405,7 +410,11 @@ server <- function(input, output, session) {
   #------------#
   datTrans <- eventReactive(input$transform, {
     N <- as.numeric(NText()) # number of facets
-    dat <- datRaw()
+    if (input$fileUploadSwitch == 0) {
+      dat = get(input$selectedExpDat)
+    }else{
+      dat = datRaw()
+    }
     
     if (preFixText() != "" & TagNamesText() != "") { #分支1.如果preFixText和TagNames都提供
       TagPreFix <- str_split(preFixText(), ",")[[1]]

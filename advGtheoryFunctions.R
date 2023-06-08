@@ -487,9 +487,9 @@ glmmTMB.VarCovMat.forboot <- function(x, facets){
 #   mGtheoryFormula = formulaWtResidTxt,
 #   g_coef = g_coef # return a mGStudy class
 # )
-n = data.frame(
-  "Item" = 10
-)
+# n = data.frame(
+#   "Item" = 10
+# )
 mdstudy <- function(x, n, unit) {
   gtheoryVarCov_Person = glmmTMB.VarCov(glmmTMBobj = model1_fit, source = "Person", mat_type = "us")
   
