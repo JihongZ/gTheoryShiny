@@ -158,8 +158,10 @@ ui <- dashboardPage(
           overflow-y:scroll; max-height: 50px; background: ghostwhite;}"))),
             tabPanel(title = "Structure table", DTOutput("nestedStrucTable")),
             tabPanel(title = "Summary table", DTOutput("factorNestTable")),
-            footer = p(em('Formular')," = recommended formular for linear mixed model;", br(), 
-                       em('Structure table')," = auto-detected nested design in data;", br(), 
+            footer = p(em('Formular')," = recommended formular for linear mixed model;", 
+                       br(), 
+                       em('Structure table')," = auto-detected nested design in data;", 
+                       br(), 
                        em('Summary table'), "= sample size for each levels of facet")
           )
         )
@@ -170,7 +172,8 @@ ui <- dashboardPage(
         fluidRow(
           
           column(width = 4,
-            box(title = "Control Panel: ", status = "danger", solidHeader = TRUE, width = NULL, 
+            box(title = "Control Panel: ", status = "danger", 
+                solidHeader = TRUE, width = NULL, 
                 textInput("selfFormular", "1. User-specified formula: ",
                           placeholder = "Default: recommeded formula"),
                 pickerInput(
@@ -189,13 +192,12 @@ ui <- dashboardPage(
                 uiOutput("nCores")
             ),
             
-            box(title = "Gstudy Estimation", status = "info", solidHeader = TRUE, width = NULL,
+            box(title = "Gstudy Estimation", status = "info", 
+                solidHeader = TRUE, width = NULL,
                 actionBttn("runGstudyButton", "Run Gstudy", style = "material-flat",
                            color = "primary", size = "sm", icon = icon('circle-play')),
-                br(), 
                 actionBttn("runGstudyBootButton", "Run Bootstrap", style = "material-flat", 
                            color = "primary", size = "sm", icon = icon("bootstrap")),
-                br(), 
                 progressBar(
                   id = "gstudybar",
                   value = 0,
@@ -204,20 +206,7 @@ ui <- dashboardPage(
                   striped = TRUE,
                   display_pct = TRUE
                 ),
-                ### 下载按钮
-                br(),
-                conditionalPanel(
-                  condition = "input.runGstudyButton >=1",
-                  downloadBttn("downloadGstudyTheta", "Factor Score Table",
-                               style = "jelly", color = "success")
-                ),
-                br(), 
-                conditionalPanel(
-                  condition = "input.runGstudyBootButton >=1",
-                  downloadBttn("downloadGstudyBootResult", 
-                                 "Bootstrapping Result",
-                                 style = "jelly", color = "success")
-                )
+                
             ),
             
             box(title = "Dstudy Estimation", status = "warning", solidHeader = TRUE, width = NULL,
@@ -226,10 +215,12 @@ ui <- dashboardPage(
                              bigger = TRUE),
                 conditionalPanel(condition = "input.runDstudyBox == 1",
                   h4("Dstudy："),
+                  
                   ### 选择要修改的facet和number of conditions
                   uiOutput("selectedFacetMenu"),
                   uiOutput("selectedFacetLevels"),
                   uiOutput("selectedMultipleFacetLevels"),
+                  
                   #选择factor levels
                   actionBttn(inputId = "confirmFacetLevel",
                              label = "Add facet levels", icon = icon("check"),
@@ -246,25 +237,15 @@ ui <- dashboardPage(
                               title = NULL,
                               striped = TRUE,
                               display_pct = TRUE),
-                  ### 下载按钮dstudy
-                  conditionalPanel(
-                    condition = "input.runDstudyButton >=1",
-                    downloadBttn("downloadDstudyResult", 
-                                 "Download dstudy result",
-                                 color = "success", style = "jelly"
-                                   ),
-                    downloadBttn("downloadDstudyBootResult", 
-                                 "Download bootstrap result",
-                                 color = "success", style = "jelly")
-                  )
                 )
             )
           ),
           
           column(width = 8,
-            box(title = "Gstudy Result", width = NULL, collapsible = TRUE, collapsed = FALSE,
+            #### Output UI for gstudy  ----
+            box(title = "Gstudy Result", width = NULL, 
+                collapsible = TRUE, collapsed = FALSE,
                 solidHeader = TRUE, status = 'info', 
-                #### Output UI for gstudy  ----
                 conditionalPanel(
                   condition = "input.runGstudyButton >= 1",
                   h4("Fixed Effects Output："),
@@ -272,33 +253,44 @@ ui <- dashboardPage(
                   h4("Random Effects Output："),
                   DTOutput("GstudyResultPrint"),
                   h4("Other Output："),
-                  verbatimTextOutput("GstudyResultExtraPrint")
+                  verbatimTextOutput("GstudyResultExtraPrint"),
+                  downloadBttn("downloadGstudyTheta", "Factor Score Table",
+                               style = "jelly", color = "success", size = 'sm')
                 ),
                 # gstudy with bootstrapping SD
                 conditionalPanel(
                   condition = "input.runGstudyBootButton >= 1",
                   h4("Estimate Bootstrapping SD for G-study："),
-                  DTOutput("recommModelGStudyBootResult")
-                )
+                  DTOutput("recommModelGStudyBootResult"),
+                  downloadBttn("downloadGstudyBootResult", 
+                               "Bootstrapping Result",
+                               style = "jelly", color = "success", size = 'sm')
+                ),
             ),
             
+            #### Output UI for dstudy  ----
             box(title = "Dstudy Result", width = NULL, collapsible = TRUE, collapsed = FALSE,
                 solidHeader = TRUE, status = 'info', 
-                #### Output UI for dstudy  ----
                 conditionalPanel(condition = "input.confirmFacetLevel >= 1",
                                  h4("Sample Size for Dstudy:"),
                                  DTOutput("updatedNDT")),
+                
                 conditionalPanel(
                   condition = "input.runDstudyButton >= 1",
-                  h4("Dstudy Output："),
-                  p("Result:"),
                   verbatimTextOutput("recommModelDStudyResult"),
+                  downloadBttn("downloadDstudyResult", 
+                               "Download dstudy result",
+                               color = "success", style = "jelly", size = 'sm'
+                  )
                 ),
                 # dstudy with bootstrapping SD
                 conditionalPanel(
                   condition = "input.runDstudyBootButton >= 1",
                   h4("Estimate Bootstrapping SD for D-study："),
-                  verbatimTextOutput("recommModelDStudyBootResult")
+                  verbatimTextOutput("recommModelDStudyBootResult"),
+                  downloadBttn("downloadDstudyBootResult", 
+                               "Download bootstrap result",
+                               color = "success", style = "jelly", size = 'sm')
                 ),
                 # plot dstudy coefficient path plot
                 conditionalPanel(
@@ -834,14 +826,15 @@ server <- function(input, output, session) {
       if (input$selfFormular == "") { # 分支2.1.若用戶沒有自定義公式
         formulaTxt <- gtheoryFormula()
         formulaRecomm <- as.formula(formulaTxt)
-        lmmFit <- glmmTMB::glmmTMB(
+        lmmFit0 <- glmmTMB::glmmTMB(
           data = datG,
           formula = formulaRecomm,
           family = linkFunc,
-          dispformula = ~0
+          dispformula = ~0,
+          REML = TRUE
         )
         ## extract residual var-cov matrix
-        residuals_Person <- cbind(residuals = residuals(lmmFit, "response"),
+        residuals_Person <- cbind(residuals = residuals(lmmFit0, "response"),
                                   datG[c(selectedID(), selectedFacet())]) %>%
           pivot_wider(names_from = selectedFixedFacet(), 
                       values_from = residuals, 
@@ -851,17 +844,19 @@ server <- function(input, output, session) {
                            use = "pairwise.complete.obs")
         residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")),
                            use = "pairwise.complete.obs")
-        
         ###### --- 
         # run second time
         ###### ---
         dat2 = datG
-        dat2$Residual = residuals(lmmFit, "response")
-        
+        dat2$Residual = residuals(lmmFit0, "response")
         if ("Residual" %in% facets_US) {
-          formulaWtResidTxt <- paste0(formulaTxt, "+ us(", selectedFixedFacet(), " + 0 | Residual)")
+          formulaWtResidTxt <- paste0(formulaTxt, 
+                                      " + us(", selectedFixedFacet(), 
+                                      " + 0 | Residual)")
         }else{
-          formulaWtResidTxt <- paste0(formulaTxt, "+ diag(", selectedFixedFacet(), " + 0 | Residual)")
+          formulaWtResidTxt <- paste0(formulaTxt, 
+                                      " + diag(", selectedFixedFacet(), 
+                                      " + 0 | Residual)")
         }
         
         formulaRecommWtResid <- as.formula(formulaWtResidTxt)
@@ -869,9 +864,9 @@ server <- function(input, output, session) {
           formula = formulaRecommWtResid,
           data = dat2,
           family = linkFunc,
-          dispformula =~0
+          dispformula =~0,
+          REML = TRUE
         )
-        
         # Extract useful information
         res <- lme4::VarCorr(lmmFit)
         resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, 
@@ -895,11 +890,13 @@ server <- function(input, output, session) {
         # Return values
         ###### ---
         list(
+          lmmFit0 = lmmFit0,
           lmmFit = lmmFit,
+          data = dat2,
           fixedEffect = fixedEffectEstimate,
           VarComp = resVarCov,
           mGtheoryFormula = formulaWtResidTxt,
-          g_coef = g_coef # return a mgStudy class
+          g_coef = g_coef # return a mGStudy class
         )
         
       } else{ # 分支2.1.若用戶自定義公式，則轉化爲lme4直接使用用戶的公式
@@ -930,16 +927,23 @@ server <- function(input, output, session) {
     updateProgressBar(session = session, id = "gstudybar", 
                       value = 30, total = 100,
                       title = "In progress")
-    boot.gstudy <-
-      lme4::bootMer(
-        gstudyResult()$lmmFit,
-        gstudy.forboot,
-        nsim = input$nboot,
-        use.u = FALSE,
-        type = "parametric",
-        parallel = "snow",
-        ncpus = nCores
-      )
+    if (input$mGtheory == FALSE) {
+      boot.gstudy <-
+        lme4::bootMer(
+          gstudyResult()$lmmFit,
+          gstudy.forboot,
+          nsim = input$nboot,
+          use.u = FALSE,
+          type = "parametric",
+          parallel = "snow",
+          ncpus = nCores
+        )
+      
+    }else if(input$mGtheory == TRUE){
+      model.fit = gstudyResult()$lmmFit
+      boot.gstudy <- confint(model.fit)
+      
+    }
     # ProgressBar: end of bootstrapping
     updateProgressBar(session = session, id = "gstudybar", 
                       value = 100, total = 100,
@@ -962,6 +966,8 @@ server <- function(input, output, session) {
       as.data.frame(cbind(gstudy_res, bootCI_gstudy_res))
     }else{
       # ongoing: placeholder for mgstudy boostrap
+      bootCI_gstudy_res <- boot_gstudy_res
+      as.data.frame(bootCI_gstudy_res)
     }
   })
   
@@ -976,7 +982,8 @@ server <- function(input, output, session) {
   output$GstudyResultExtraPrint <- renderText({
     if (input$mGtheory == TRUE) {
       glue::glue("g-coefficient: {gstudyResult()$g_coef}\n
-                 glmmTMB formula: {gstudyResult()$mGtheoryFormula}")
+                 glmmTMB formula: {gstudyResult()$mGtheoryFormula}\n
+                 Note: the bootstrapping method of mGtheory uses non-bootstrapping confidence intervals")
     }
   })
   output$recommModelGStudyBootResult <- renderDT({

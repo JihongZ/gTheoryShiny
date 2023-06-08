@@ -115,16 +115,16 @@ dstudy(x = gstudy.res, n = list(Dimension = 100, Item_ID = 100), unit = "Person_
 
 
 ## Using Simulated RCG example -----
-
 ###### --- 
 # Alternative way of mG-theory following Jiang (2022)
 # Refer to Brennan (2001a, Chap. 9)
 ###### ---
 # read.table("https://alabama.box.com/shared/static/9omab5aadtp2ofvkmcqamtv1c2vw8sqq.txt")
 rm(list = ls())
-
 library(dplyr)
 library(gtheory)
+library(mvtnorm)
+library(tidyverse)
 
 #------------#
 # Data simulation
@@ -148,30 +148,34 @@ pi.effect.cov <- matrix(c(
   0,         0,         0.4286
 ), 3,3, byrow = TRUE)
 
-N.i = 50
-N.p = 100
+N.p = 1000
+N.i = 100
 N.h = 3
-grand.mean = c(40, 50, 60)
+grand.mean = c(0, 0, 0)
 
 
 # For Person Effect; 100 X 300
 # 100 X 3
-set.seed(221203)
-temp.p <- rmvnorm(N.p, grand.mean, p.effect.cov)
+set.seed(20230608)
+temp.p <- rmvnorm(N.p, mean = grand.mean, sigma = p.effect.cov)
+cov(temp.p)
+
 TEMP.P <- NULL
 for(v in 1:N.h) {
   for (i in 1:N.i) {
     TEMP.P <- cbind(TEMP.P, temp.p[, v])
   }
 }	
+dim(TEMP.P)
 
 #For Item Effect; 100:200
 temp.i <- rmvnorm(N.i, rep(0, N.h), i.effect.cov)
+cov(temp.i)
 TEMP.I <- NULL
 for (p in 1:N.p) {
   TEMP.I.OneRow = NULL
   for (v in 1:N.h) {
-    TEMP.I.OneRow = c(TEMP.I.OneRow, t(temp.i)[v, ])
+    TEMP.I.OneRow = c(TEMP.I.OneRow, temp.i[,v])
   }
   TEMP.I <- rbind(TEMP.I,  TEMP.I.OneRow)
 }
@@ -182,17 +186,32 @@ TEMP.E <- matrix(temp.e, N.p, N.i * N.h)
 Dat1 <- TEMP.P + TEMP.I + TEMP.E
 rownames(Dat1) <- NULL
 
-Dat1 <- Dat1 |>
+Dat1_addRowNames <- Dat1 |>
   as.data.frame() |> 
   rownames_to_column("Person")
 
 Dat_out <- rbind(
     c("Person", rep(paste0("I", 1:N.i), N.h)),
     c("Person", rep(paste0("V", 1:N.h), each = N.i)),
-    Dat1
+    Dat1_addRowNames
 )
 
 write.csv(Dat_out, file = "ExampleCode/Zhehan/RCGI100P100.csv", row.names = FALSE)
+
+###### --- 
+# Wide to long transformation
+###### ---
+datRaw <- Dat_out[3:nrow(Dat_out), ]
+colnames(datRaw) <-  c("Person" , apply(t(Dat_out[1:2, -1]), 1, \(x) paste0(x, collapse = "_")))
+dat <- datRaw |> 
+  pivot_longer(-Person, names_to = "Item", values_to = "Score") |> 
+  separate(Item, into = c("Item", "Subtest")) |> 
+  mutate(
+    Item = factor(Item, levels = paste0("I", 1:N.i)),
+    Subtest = factor(Subtest, levels = paste0("V", 1:N.h)),
+    Score = as.numeric(Score)
+  )
+
 #------------#
 # End
 #------------#
@@ -203,40 +222,34 @@ cor2cov <- function(R, S) { #
   sweep(sweep(R, 1, S, "*"), 2, S, "*")
 }
 
-cov_component <- function(obj, source, mat_type = "us") {
-  res = VarCorr(obj)
-  if (mat_type == "diag") {
-    cor2cov(S = attr(res$cond[[source]], "stddev"), R = diag(1, length(attr(res$cond[[source]], "stddev"))))
-  }else if(mat_type == "us"){
-    sd_facet  <- attr(res$cond[[source]], "stddev")
-    cor_facet <- attr(res$cond[[source]], "correlation")
-    cov_facet <- cor2cov(R = cor_facet, S = sd_facet)
-    cov_facet
-  }
-}
+
 
 ###### --- 
 # lmer method
 ###### ---
 m1_GT <- as.formula("Score~0+Subtest + (0+Subtest|Person) + (0+Subtest|Item)")
 suppressWarnings(m1_GT_fit <- lmer(m1_GT, dat, REML = FALSE))
-m1_GT_fit
-
-datlmer = dat
-datlmer$pi = residuals(m1_GT_fit)
-m2_GT <- as.formula("Score~0+Subtest+(Subtest|Person)+(Subtest|Item)+(Subtest|pi)")
-suppressWarnings(m2_GT_fit <- lmer(m2_GT, datlmer))
-m2_GT_fit
+cor2cov(
+  R = attr(VarCorr(m1_GT_fit)$Person, "correlation"),
+  S = attr(VarCorr(m1_GT_fit)$Person, "stddev")
+)
+cor2cov(
+  R = attr(VarCorr(m1_GT_fit)$Item, "correlation"),
+  S = attr(VarCorr(m1_GT_fit)$Item, "stddev")
+)
 
 ###### --- 
 # mG-theory
 ###### ---
 m1_mGT <- as.formula("Score~ Subtest + us(0+Subtest|Person) + diag(0+Subtest|Item)")
-suppressWarnings(m1_mGT_fit <- glmmTMB::glmmTMB(m1_mGT, dat, family = gaussian, dispformula =~0))
-m1_mGT_fit
 
-cov_component(obj = m1_mGT_fit, source = "Person", mat_type = "us")
-cov_component(obj = m1_mGT_fit, source = "Item", mat_type = "us")
+system.time(
+  suppressWarnings(m1_mGT_fit <- glmmTMB::glmmTMB(m1_mGT, dat, 
+                                                  family = gaussian, dispformula =~0,
+                                                  control = glmmTMBControl(parallel = 5)))
+)
+cov_component(m1_mGT_fit, source = "Person", mat_type = "us")
+cov_component(m1_mGT_fit, source = "Item", mat_type = "us")
 
 ### second run  -------------------------------------------------------------
 dat2 = dat
@@ -311,3 +324,7 @@ resVarCor |>
   mutate(
     across(any_of(colnames(resVarCor)[-(1:2)]), \(x) round(as.numeric(x),3))
   )
+
+
+## Brennan 9.8 -----
+

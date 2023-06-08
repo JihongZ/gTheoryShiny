@@ -382,7 +382,6 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
     dat_cor = dat_cov = dat
     
     ## diagnal: sd, off-diagnal: cor
-    
     cor_mat <- as.matrix(dat[str_detect(colnames(dat), pattern = facetName)])
     
     if( any(is.na(cor_mat[lower.tri(cor_mat)])) ) {
@@ -451,4 +450,72 @@ extractFixedCoefsmG <- \(lmeObj){
   fixedEstTable <- summary(lmeObj)$coefficients$cond
   colnames(fixedEstTable) <- c("Estimate", "SE", "Z", "p-value")
   as.data.frame(fixedEstTable)
+}
+
+## variance-covariance component from glmmTMB object
+glmmTMB.VarCov <- function(glmmTMBobj, source, mat_type = "us") {
+  res = VarCorr(glmmTMBobj)
+  if (mat_type == "diag") {
+    cor2cov(S = attr(res$cond[[source]], "stddev"), R = diag(1, length(attr(res$cond[[source]], "stddev"))))
+  }else if(mat_type == "us"){
+    sd_facet  <- attr(res$cond[[source]], "stddev")
+    cor_facet <- attr(res$cond[[source]], "correlation")
+    cov_facet <- cor2cov(R = cor_facet, S = sd_facet)
+    cov_facet
+  }
+}
+
+## Extract all variance-covariance components
+glmmTMB.VarCovMat.forboot <- function(x, facets){
+  res = NULL
+  for (facet in facets) {
+    res = c(res, as.numeric(VarCorr(x)[[c("cond", facet)]]))
+  }
+  res
+}
+
+## Arguments
+## x: glmmTMB result
+## n: update N
+## unit
+# list(
+#   lmmFit0 = lmmFit0,
+#   lmmFit = lmmFit,
+#   data = dat2,
+#   fixedEffect = fixedEffectEstimate,
+#   VarComp = resVarCov,
+#   mGtheoryFormula = formulaWtResidTxt,
+#   g_coef = g_coef # return a mGStudy class
+# )
+n = data.frame(
+  "Item" = 10
+)
+mdstudy <- function(x, n, unit) {
+  gtheoryVarCov_Person = glmmTMB.VarCov(glmmTMBobj = model1_fit, source = "Person", mat_type = "us")
+  
+  gtheoryVarCov <- glmmTMB.VarCov(glmmTMBobj = model1_fit, source = "Residual", mat_type = "us")
+  dtheoryVarCov <- gtheoryVarCov / n[["Item"]]
+  
+  residuals_Person <- cbind(residuals = residuals(model1_fit, "response"),
+                            datG[c(selectedID(), selectedFacet())]) %>%
+    pivot_wider(names_from = selectedFixedFacet(), 
+                values_from = residuals, 
+                names_prefix = "facet") %>%
+    ungroup()
+  residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")),
+                     use = "pairwise.complete.obs")
+  residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")),
+                     use = "pairwise.complete.obs")
+  
+  ###### --- 
+  # run second time
+  ###### ---
+  dat2 = datG
+  dat2$Residual = residuals(lmmFit0, "response")
+  
+  # the estimates of the universe score
+  
+  # relative error
+  
+  # absolute error matrices
 }
