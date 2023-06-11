@@ -373,7 +373,11 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
   }
   rownames(r) <- NULL
   
-  r[r$sdcor == 0 & r$grp == "Residual", ]["sdcor"] = residCor[lower.tri(residCor)]
+  ## replace 0 as residuals correlation
+  
+  if (all(r[r$sdcor == 0 & r$grp == "Residual", ]["sdcor"] == 0)) {
+    r[r$sdcor == 0 & r$grp == "Residual", ]["sdcor"] = residCor[lower.tri(residCor)]
+  }
   
   ## function to convert triangle matrix into correlation matrix
   toCorrCovTbl <- function(dat, facet = facetName) {
@@ -490,32 +494,22 @@ glmmTMB.VarCovMat.forboot <- function(x, facets){
 # n = data.frame(
 #   "Item" = 10
 # )
-mdstudy <- function(x, n, unit) {
-  gtheoryVarCov_Person = glmmTMB.VarCov(glmmTMBobj = model1_fit, source = "Person", mat_type = "us")
+dstudy.VarCov <- function(gstudyVarCovMat, n, facetName) {
   
-  gtheoryVarCov <- glmmTMB.VarCov(glmmTMBobj = model1_fit, source = "Residual", mat_type = "us")
-  dtheoryVarCov <- gtheoryVarCov / n[["Item"]]
+  gstudyVarCorList <- gstudyVarCovMat |> 
+    group_split(Source)
+  names(gstudyVarCorList) <- sapply(gstudyVarCorList, \(x) unique(x$Source))
   
-  residuals_Person <- cbind(residuals = residuals(model1_fit, "response"),
-                            datG[c(selectedID(), selectedFacet())]) %>%
-    pivot_wider(names_from = selectedFixedFacet(), 
-                values_from = residuals, 
-                names_prefix = "facet") %>%
-    ungroup()
-  residual_cor = cor(residuals_Person |> dplyr::select(starts_with("facet")),
-                     use = "pairwise.complete.obs")
-  residual_cov = cov(residuals_Person |> dplyr::select(starts_with("facet")),
-                     use = "pairwise.complete.obs")
-  
-  ###### --- 
-  # run second time
-  ###### ---
-  dat2 = datG
-  dat2$Residual = residuals(lmmFit0, "response")
-  
-  # the estimates of the universe score
-  
-  # relative error
-  
-  # absolute error matrices
+  dstudyVarCorList <- c(
+    gstudyVarCorList[setdiff(names(gstudyVarCorList), c(colnames(n), "Residual"))],
+    lapply(gstudyVarCorList[c(colnames(n), "Residual")], \(x) {
+      cbind(dplyr::select(x, -starts_with(facetName)), 
+            dplyr::select(x, starts_with(facetName)) / prod(as.numeric(n)))
+    })
+  )
+  # Sigmap <- dplyr::select(dstudyVarCorList[[IDName]], starts_with(facetName))
+  # SigmapI <- dplyr::select(dstudyVarCorList[["Residual"]], starts_with(facetName))
+  # SigmaI <- dplyr::select(dstudyVarCorList[[names(n)]], starts_with(facetName))
+  # 
+  Reduce("rbind", dstudyVarCorList)
 }

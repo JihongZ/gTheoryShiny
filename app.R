@@ -192,7 +192,7 @@ ui <- dashboardPage(
                 ),
                 uiOutput("nCores")
             ),
-            
+            ### Input UI for gstudy -----
             box(title = "Gstudy Estimation", status = "info", 
                 solidHeader = TRUE, width = NULL,
                 actionBttn("runGstudyButton", "Run Gstudy", style = "material-flat",
@@ -209,8 +209,9 @@ ui <- dashboardPage(
                 ),
                 
             ),
-            
-            box(title = "Dstudy Estimation", status = "warning", solidHeader = TRUE, width = NULL,
+            ### Input UI for dstudy -----
+            box(title = "Dstudy Estimation", status = "warning", 
+                solidHeader = TRUE, width = NULL,
                 prettySwitch("runDstudyBox", label = "Run Dstudy", 
                              value = FALSE,
                              bigger = TRUE),
@@ -228,16 +229,18 @@ ui <- dashboardPage(
                              style = "material-flat", color = "primary", size = "sm"),
                   actionBttn("runDstudyButton", "Run", icon = icon('circle-play'),
                              style = "material-flat", color = "primary", size = "sm"),
-                  actionBttn("runDstudyBootButton", "Run Bootstrap", icon = icon("bootstrap"),
-                             style = "material-flat", color = "primary", size = "sm"),
-                  actionBttn("plotDstudyCoef", "Visualize", icon = icon('image'),
-                             style = "material-flat", color = "primary", size = "sm"),
-                  progressBar(id = "dstudybar", 
-                              value = 0,
-                              total = 100,
-                              title = NULL,
-                              striped = TRUE,
-                              display_pct = TRUE),
+                  conditionalPanel(condition = "input.mgtheory == 0", 
+                    actionBttn("runDstudyBootButton", "Run Bootstrap", icon = icon("bootstrap"),
+                               style = "material-flat", color = "primary", size = "sm"),
+                    actionBttn("plotDstudyCoef", "Visualize", icon = icon('image'),
+                               style = "material-flat", color = "primary", size = "sm"),
+                    progressBar(id = "dstudybar", 
+                                value = 0,
+                                total = 100,
+                                title = NULL,
+                                striped = TRUE,
+                                display_pct = TRUE),
+                  ),
                 )
             )
           ),
@@ -555,11 +558,13 @@ server <- function(input, output, session) {
       # all random facets except fixed facet
       all_facets = c(selectedID(), selectedFacet())
       random_facets <- setdiff(all_facets, input$selectedFixedFacet)
+      choice_facets = random_facets
+      
       checkboxGroupButtons(
         "selectedFacetWithUSComponent",
         label = "6. Select facet(s) with covariances to be estimated:",
         choices = c(random_facets, "Residual"),
-        selected = random_facets,
+        selected = choice_facets,
         status = "success",
         checkIcon = list(
           no = icon("circle"),
@@ -1025,9 +1030,14 @@ server <- function(input, output, session) {
     # Select which facet to add sample size
     #------------#
     output$selectedFacetMenu <- renderUI({
+      if (input$mGtheory == FALSE) {
+        choices = selectedFacet()
+      }else{
+        choices = setdiff(selectedFacet(), selectedFixedFacet())
+      }
       pickerInput(inputId = "FacetDStudySelector",
                   label = "Select facet:",
-                  choices = selectedFacet(),
+                  choices = choices,
                   multiple = FALSE)
     })
     
@@ -1126,8 +1136,13 @@ server <- function(input, output, session) {
       gstudy_res <- gstudyResult()$gstudy
       dstudy_res = dstudy(x = gstudy_res, n = updatedN, unit = selectedID())
     }else{# 分支2: 若為multivariate gstudy,运行mdstudy
-      mgstudy_res <- gstudyResult()$mgstudy
-      dstudy_res = mdstudy(x = mgstudy_res, n = updatedN, unit = selectedID())
+      gstudyVarCovMat <- gstudyResult()$VarComp
+      facetName <- selectedFixedFacet()
+      n <- updatedN[setdiff(names(updatedN), facetName)]
+      
+      dstudy_res = dstudy.VarCov(gstudyVarCovMat = gstudyVarCovMat,
+                                 n = n,
+                                 facetName = facetName)
     }
     
     dstudy_res
@@ -1210,7 +1225,13 @@ server <- function(input, output, session) {
 
   
   ### Output dstudy results and bootstrapping  ----------------------------------------
-  output$recommModelDStudyResult <- renderPrint({print.dStudy(dstudyResult())})
+  output$recommModelDStudyResult <- renderPrint({
+    if(input$mGtheory == FALSE){
+      print.dStudy(dstudyResult())
+    }else{
+      print(dstudyResult())
+    }
+  })
   output$recommModelDStudyBootResult <- renderPrint({dstudyResultBootCI()})
   
   ### Output path plot of dstudy ----------------------------------------
