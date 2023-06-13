@@ -24,7 +24,7 @@ source("tutorial_page.R")
 source("modules/inputFile_module.R") # Input CSV file
 source("modules/LongToWide_module.R") # Long format to Wide format
 
-## Load example data
+## Load example data sets 
 data("Rajaratnam.2", package = "gtheory")
 data("Brennan.3.2", package = "gtheory")
 Brennan.9.3 <- read.csv("https://raw.githubusercontent.com/JihongZ/gTheoryShiny/main/data/Brennan.9.3.csv")
@@ -325,15 +325,15 @@ server <- function(input, output, session) {
   ### Read in original data ----------------------------------------
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
-  ### Reactive dat -----
-  dat <- eventReactive(input$dataConfirm, {
-    if(input$transform == 1){
+  ### Reactive data: for further analysis -----
+  dat <- eventReactive(input$dataConfirm | input$isLongFormat, {
+    if(input$transform == 1){ # transformed data
       datTrans()
     }else{
-      if (input$fileUploadSwitch == 0) { # if use example data
+      if (input$fileUploadSwitch == 0) { # built-in example data
         dat = get(input$selectedExpDat)
         dat
-      }else{ # if use user-uploaded data
+      }else{ # if use user-uploaded not-transformed data
         datRaw()
       }
     }
@@ -362,45 +362,38 @@ server <- function(input, output, session) {
   NText = reactive({input$nRows}) # 有多少行是tag/ID
   preFixText = reactive({input$TagPreFix}) # 前缀，比如A;B;C
   TagNamesText = reactive({input$TagNames}) # facet的name比如：Class;Rater;Item
-  
-  observeEvent(input$isLongFormat, {
-    if (input$fileUploadSwitch == 0) {
-      dat = get(input$selectedExpDat)
-    }else{
-      dat = datRaw()
-    }
-    # 按下"transform"按钮后，将原始数据转换为长数据格式:
-    output$nRowsSelection <- renderUI({ # 选择多少行代表Facet Tags，每一行代表一个facet
-      pickerInput(
-        "nRows",
-        "Select the number of rows containing facets (not including headings)",
-        choices = 0:nrow(dat),
-        selected = 0
-      )
-    })
-    
-    # when observed client specify number of rows denoting facets, react to update TagNames and TagPrefix
-    observeEvent(input$nRows, {
-      number_rows_facets = NText()
-      number_rows_facets <- max(1, number_rows_facets)
-      
-      prefix = apply(dat[1:max(1, NText()),-1], 1, \(x) str_remove(x, "[0-9]+")[1])
-      
-      output$preFixText <- renderUI({ # 为facets选择prefix
-        textInput("TagPreFix", 
-                  label = "Enter prefix of facet levels seperated by `,`（for example, `O,I`)" , 
-                  value = paste0(prefix, collapse = ","))
-      })
-      
-      output$TagNamesText <- renderUI({
-        textInput("TagNames",
-                  label = "Enter facet's names seperated by `,` (for example, `Occasion,Item`)",
-                  value = paste0(paste0(LETTERS[1:number_rows_facets], letters[1:number_rows_facets]),
-                                 collapse = ","))
-      })
-    })
-    
+
+  ### Selected rows for facets
+  output$nRowsSelection <- renderUI({ # 选择多少行代表Facet Tags，每一行代表一个facet
+    dat <- isolate(dat())
+    pickerInput(
+      "nRows",
+      "Select the number of rows containing facets (not including headings)",
+      choices = 0:nrow(dat),
+      selected = 0
+    )
   })
+  
+  ### React to update prefix and N
+  observeEvent(input$nRows, {
+    dat <- isolate(dat()) # not react to changes in dat
+    # extract prefix from heading rows
+    prefix = apply(dat[1:max(1, NText()),-1], 1, \(x) str_remove(x, "[0-9]+")[1])
+    
+    output$preFixText <- renderUI({ # 为facets选择prefix
+      textInput("TagPreFix", 
+                label = "Enter prefix of facet levels seperated by `,`（for example, `O,I`)" , 
+                value = paste0(prefix, collapse = ","))
+    })
+    
+    output$TagNamesText <- renderUI({
+      textInput("TagNames",
+                label = "Enter facet's names seperated by `,` (for example, `Occasion,Item`)",
+                value = paste0(paste0(str_to_upper(prefix), head(letters, length(prefix))), collapse = ',')
+                )
+    })
+  })
+    
   
 
   #------------#
