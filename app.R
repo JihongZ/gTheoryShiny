@@ -325,18 +325,31 @@ server <- function(input, output, session) {
   ### Read in original data ----------------------------------------
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
+<<<<<<< HEAD
   ### Reactive data: for further analysis -----
   dat <- eventReactive(input$dataConfirm | input$isLongFormat, {
     if(input$transform == 1){ # transformed data
+=======
+  ### Reactive dat -----
+  dat <- eventReactive(input$dataConfirm, {
+    
+    if(input$transform == 1){
+>>>>>>> 28f0e89 (some updates)
       datTrans()
     }else{
       if (input$fileUploadSwitch == 0) { # built-in example data
         dat = get(input$selectedExpDat)
         dat
+<<<<<<< HEAD
       }else{ # if use user-uploaded not-transformed data
         datRaw()
       }
+=======
+      }else{datRaw()} # if use user-uploaded data
+      
+>>>>>>> 28f0e89 (some updates)
     }
+    
   })
   
   ### Output raw data table-----
