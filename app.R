@@ -124,54 +124,60 @@ ui <- dashboardPage(
       ### Tab Page 2: Data Structure  ----
       tabItem(tabName = "datastructure",
         fluidRow(
-          box(title = "Data Structure：", width = 4, 
-              status = "primary", solidHeader = TRUE,
-              # show selection area for ID
-              uiOutput("selectedID"),
-              # show selection area for outcome
-              uiOutput("selectedOutcome"),
-              # show selection area for facets
-              uiOutput("selectedMultipleFacets"),
-              # Missing data
-              pickerInput(
-                "missingMethod",
-                label = "4. Missing Method:",
-                choices = missingMethods,
-                selected = missingMethods[1]
-              ),
-              # show selection area for covariates
-              hr(),
-              uiOutput("selectedCovariates"),
-              hr(),
-              uiOutput("mGtheory"),
-              conditionalPanel(
-                condition = "input.mGtheory == 1",
-                uiOutput("selectedFixedFacet"),
-                uiOutput("selectedFacetWithUSComponent"), # facet with unstructured components
-                verbatimTextOutput("reportFacets"),
-              ),
-              actionBttn("variableSettingConfirm", "Confirm", 
-                         icon = icon("circle"), style = "jelly", color = "primary", size = "sm")
+          column(width = 4, 
+                 box(title = "Data Structure：", width = 12,
+                     status = "primary", solidHeader = TRUE,
+                     # show selection area for ID
+                     uiOutput("selectedID"),
+                     # show selection area for outcome
+                     uiOutput("selectedOutcome"),
+                     # show selection area for facets
+                     uiOutput("selectedMultipleFacets"),
+                     # Missing data
+                     pickerInput(
+                       "missingMethod",
+                       label = "4. Missing Method:",
+                       choices = missingMethods,
+                       selected = missingMethods[1]
+                     ),
+                     # show selection area for covariates
+                     hr(),
+                     uiOutput("selectedCovariates"),
+                     hr(),
+                     uiOutput("mGtheory"),
+                     conditionalPanel(
+                       condition = "input.mGtheory == 1",
+                       uiOutput("selectedFixedFacet"),
+                       uiOutput("selectedFacetWithUSComponent"), # facet with unstructured components
+                       verbatimTextOutput("reportFacets"),
+                     ),
+                     actionBttn("variableSettingConfirm", "Confirm", 
+                                icon = icon("circle"), style = "jelly", color = "primary", size = "sm")
+                 )
           ),
-          tabBox(id = "modelDesign", title = tagList(icon("diagram-next"), "Design"), 
-            tabPanel(title = "Formular", textOutput("recommFormular"), 
+          column(width = 8, 
+                 box(title = "Formular", width = 12, 
+                     textOutput("recommFormular"), 
                      tags$head(tags$style("#recommFormular{color:red; font-size:14px; font-style:bold;
-          overflow-y:scroll; max-height: 50px; background: ghostwhite;}"))),
-            tabPanel(title = "Structure table", DTOutput("nestedStrucTable")),
-            tabPanel(title = "Summary table", DTOutput("factorNestTable")),
-            footer = p(em('Formular')," = recommended formular for linear mixed model;", 
-                       br(), 
-                       em('Structure table')," = auto-detected nested design in data;", 
-                       br(), 
-                       em('Summary table'), "= sample size for each levels of facet")
+          overflow-y:scroll; max-height: 50px; background: ghostwhite;}"))
+                 ),
+                 box(title = "Structure table", width = 12, 
+                     DTOutput("nestedStrucTable")
+                 ),
+                 box(title = "Summary table", width = 12, 
+                     DTOutput("factorNestTable"),
+                     footer = p(em('Formular')," = recommended formular for linear mixed model;", 
+                                br(), 
+                                em('Structure table')," = auto-detected nested design in data;", 
+                                br(), 
+                                em('Summary table'), "= sample size for each levels of facet")
+                 )
           )
         )
       ),
-      
       ### Tab Page 3: Data Analysis  ----
       tabItem(tabName = "dataanalysis",
         fluidRow(
-          
           column(width = 4,
             box(title = "Control Panel: ", status = "danger", 
                 solidHeader = TRUE, width = NULL, 
@@ -207,7 +213,6 @@ ui <- dashboardPage(
                   striped = TRUE,
                   display_pct = TRUE
                 ),
-                
             ),
             ### Input UI for dstudy -----
             box(title = "Dstudy Estimation", status = "warning", 
@@ -325,31 +330,18 @@ server <- function(input, output, session) {
   ### Read in original data ----------------------------------------
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
-<<<<<<< HEAD
   ### Reactive data: for further analysis -----
-  dat <- eventReactive(input$dataConfirm | input$isLongFormat, {
+  dat <- eventReactive(input$fileUploadSwitch | input$isLongFormat, {
     if(input$transform == 1){ # transformed data
-=======
-  ### Reactive dat -----
-  dat <- eventReactive(input$dataConfirm, {
-    
-    if(input$transform == 1){
->>>>>>> 28f0e89 (some updates)
       datTrans()
     }else{
       if (input$fileUploadSwitch == 0) { # built-in example data
         dat = get(input$selectedExpDat)
         dat
-<<<<<<< HEAD
       }else{ # if use user-uploaded not-transformed data
         datRaw()
       }
-=======
-      }else{datRaw()} # if use user-uploaded data
-      
->>>>>>> 28f0e89 (some updates)
     }
-    
   })
   
   ### Output raw data table-----
@@ -458,7 +450,6 @@ server <- function(input, output, session) {
       # Show a modal when the button is pressed
       shinyalert("Oops!", "Your specification of facets are not correct.", type = "error")
     }
-    
     datTrans
   })
 
@@ -481,6 +472,14 @@ server <- function(input, output, session) {
       icon = icon("check")
     )
   })
+  observeEvent(dat(), {
+    updateActionButton(
+      session,
+      inputId = "dataConfirm",
+      icon = icon("circle")
+    )
+  })
+  
   
   observeEvent(input$transform, {
     updateTabsetPanel(
@@ -608,19 +607,17 @@ server <- function(input, output, session) {
   ## missing data inputation
   datNARemoved <- eventReactive(input$variableSettingConfirm, {
     dat <- dat()
-    method <- selectedMissingMethod()
     selectedOutcome <- selectedOutcome()
-    
     ## Deal with missing method for outcome variables
-    if(method == "Zero Inputation"){
+    if(selectedMissingMethod() == "Zero Inputation"){
       dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
                                         is.na(dat[[selectedOutcome]]), 
                                         0)
-    }else if(method == "Mean Inputation"){
+    }else if(selectedMissingMethod() == "Mean Inputation"){
       dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
                                         is.na(dat[[selectedOutcome]]), 
                                         mean(dat[[selectedOutcome]], na.rm = TRUE))
-    }else if(method == "Median Inputation"){
+    }else if(selectedMissingMethod() == "Median Inputation"){
       dat[[selectedOutcome]] <- replace(dat[[selectedOutcome]], 
                                         is.na(dat[[selectedOutcome]]), 
                                         median(dat[[selectedOutcome]], na.rm = TRUE))
@@ -887,14 +884,15 @@ server <- function(input, output, session) {
           dispformula =~0,
           REML = TRUE
         )
-        # Extract useful information
+        # Extract variance component matrix
         res <- lme4::VarCorr(lmmFit)
-        resVarCor <- extract.VarCorr.glmmTMB(x = res$cond, 
-                                             residCor = residual_cor, 
-                                             facetName = selectedFixedFacet())$resTable_cor
-        resVarCov <- extract.VarCorr.glmmTMB(x = res$cond, 
-                                             residCor = residual_cor, 
-                                             facetName = selectedFixedFacet())$resTable_cov
+        resVarCorMat <- extract.VarCorr.glmmTMB(x = res$cond,
+                                                residCor = residual_cor,
+                                                facetName = selectedFixedFacet())
+        resVarCor <- resVarCorMat$resTable_cor
+        resVarCov <- resVarCorMat$resTable_cov
+        
+        # Extract fit estiates
         fixedEffectEstimate <- extractFixedCoefsmG(lmmFit)
         
         ## generalizability coefficient
@@ -929,7 +927,7 @@ server <- function(input, output, session) {
   output$nCores <- renderUI({
     pickerInput(inputId = "nCores",
                 label = "4. Select number of cores for bootstrapping:",
-                selected = parallel::detectCores()-1,
+                selected = min(2, parallel::detectCores()),
                 choices = 1:parallel::detectCores())
   })
   nCores <- reactive(input$nCores)
@@ -939,7 +937,6 @@ server <- function(input, output, session) {
   ###### ---
   gstudyResultBoot <- eventReactive(input$runGstudyBootButton, {
     datGBoot <- datNARemoved()
-    nCores <- nCores()
     datGBoot[[selectedOutcome()]] <- as.numeric(datGBoot[[selectedOutcome()]])
     datGBoot[c(input$selectedID, selectedFacet())] <- lapply(datGBoot[c(input$selectedID, selectedFacet())], as.factor)
     
@@ -956,9 +953,8 @@ server <- function(input, output, session) {
           use.u = FALSE,
           type = "parametric",
           parallel = "snow",
-          ncpus = nCores
+          ncpus = nCores()
         )
-      
     }else if(input$mGtheory == TRUE){
       model.fit = gstudyResult()$lmmFit
       boot.gstudy <- confint(model.fit)
