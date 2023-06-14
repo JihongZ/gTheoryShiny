@@ -331,8 +331,18 @@ server <- function(input, output, session) {
   datRaw <- csvFileServer("fileUpload", stringsAsFactors = FALSE)
   
   ### Reactive data: for further analysis -----
-  dat <- eventReactive(input$fileUploadSwitch | input$isLongFormat, {
-    if(input$transform == 1){ # transformed data
+  # input$fileUploadSwitch | input$isLongFormat
+  AnyChange <- reactive({
+    list(
+      fileUpload = input$fileUpload,
+      selectedExpDat = input$selectedExpDat,
+      fileUploadSwitch = input$fileUploadSwitch,
+      isLongFormat = input$isLongFormatm,
+      transform = input$transform
+    )
+  })
+  dat <- eventReactive(AnyChange(), {
+    if(input$transform >= 1){ # transformed data
       datTrans()
     }else{
       if (input$fileUploadSwitch == 0) { # built-in example data
@@ -381,7 +391,7 @@ server <- function(input, output, session) {
   
   ### React to update prefix and N
   observeEvent(input$nRows, {
-    dat <- isolate(dat()) # not react to changes in dat
+    dat <- isolate(dat()) # not react to changes in dat because of changes in input
     # extract prefix from heading rows
     prefix = apply(dat[1:max(1, NText()),-1], 1, \(x) str_remove(x, "[0-9]+")[1])
     
