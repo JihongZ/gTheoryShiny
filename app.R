@@ -27,7 +27,7 @@ source("modules/LongToWide_module.R") # Long format to Wide format
 ## Load example data sets 
 data("Rajaratnam.2", package = "gtheory")
 data("Brennan.3.2", package = "gtheory")
-Brennan.9.3 <- read.csv("https://raw.githubusercontent.com/JihongZ/gTheoryShiny/main/data/Brennan.9.3.csv")
+Brennan.9.3 <- read.csv("data/Brennan.9.3.csv")
 
 # UI ----------------------------------------------------------------------
 ui <- dashboardPage(
