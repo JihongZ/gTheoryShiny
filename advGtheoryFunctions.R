@@ -432,17 +432,25 @@ extract.VarCorr.glmmTMB <- function (x, row.names = NULL, optional = FALSE,
 
 
 # generalizability coefficient
-gCoef_mGTheory <- function(dat,
-                           nDimension,
-                           glmmTMBObj,
-                           residual_cov,
-                           person_ID) {
-  a = matrix(rep(1, nDimension), ncol = 1) # equal weights
+gCoef_mGTheory <- function(
+                           glmmTMBObj=NULL,
+                           residual_cov=NULL,
+                           person_ID=NULL, 
+                           weights = NULL,
+                           person_cov = NULL
+                           ) {
+  
+  ## adjust effective weights
+  a = as.numeric(str_split(weights, ";")[[1]])
+  a = a[!is.na(a)]
+  a = a / sum(a)
   
   ## calculate person variance components
-  person_sd  <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "stddev")
-  person_cor <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "correlation")
-  person_cov <- diag(person_sd)%*%person_cor%*%diag(person_sd)
+  if (is.null(person_cov)) {
+    person_sd  <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "stddev")
+    person_cor <- attr(lme4::VarCorr(glmmTMBObj)$cond[[person_ID]], "correlation")
+    person_cov <- diag(person_sd) %*% person_cor %*% diag(person_sd)
+  }
   
   rho = 1 / ( 1 + (t(a)%*%residual_cov%*%a) / (t(a)%*%person_cov%*%a))
   rho

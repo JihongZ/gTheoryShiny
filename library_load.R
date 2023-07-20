@@ -7,6 +7,7 @@ library_load <-
       "shinyalert",
       "shinydashboard",
       "shinyWidgets", # for widgets like progress bar
+      "markdown", # for widgets like progress bar
       "DT", # for data table
       "glmmTMB", # for co-variate model
       "gtheory", # for gtheory

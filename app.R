@@ -1,4 +1,3 @@
-#
 # This is a Shiny web application for g theory visualization. 
 #
 # Data:
@@ -18,7 +17,6 @@ source("library_load.R")
 source("advGtheoryFunctions.R")
 
 ## Include elements of html
-source("tutorial_page.R")
 
 ## Source all modules
 source("modules/inputFile_module.R") # Input CSV file
@@ -34,7 +32,7 @@ ui <- dashboardPage(
   skin = "purple",
   
   ## title
-  dashboardHeader(title = "GtheoryShiny App"),
+  dashboardHeader(title = "gTheoryShiny App"),
   
   ## Sidebar content -----
   dashboardSidebar(
@@ -52,9 +50,20 @@ ui <- dashboardPage(
   
   ## Body content -----
   dashboardBody(
+    tags$head(
+      tags$link(rel = "stylesheet", type = "text/css", href = "default_mode.css")
+    ),
     tabItems(
       ### Tab Page 0: Tutorial ----
-      tabItem(tabName = "tutorial", tutorial_page),
+      tabItem(tabName = "tutorial", 
+              fluidPage(
+                # title
+                titlePanel(""),
+                box(width = 12, title = "gTheoryShiny Tutorial",
+                    includeMarkdown("tutorial_content.md"), 
+                )
+              )
+      ),
       
       ### Tag Page 1: Transform data  ----
       tabItem(tabName = "datainput",
@@ -102,8 +111,9 @@ ui <- dashboardPage(
               actionBttn("dataConfirm", label = "Confirm", icon = icon("circle"), 
                          style = "jelly", color = "primary", size = "sm")
           ),
-          tabBox(title = tagList(shiny::icon("th"), "Data"), 
-            width = 8, id = "tabsetData", 
+          column(width = 8, 
+          tabBox(title = tagList(shiny::icon("th"), "Data"), width = 12,
+            id = "tabsetData", 
             tabPanel(title = "Raw", DTOutput("rawDataTable")),
             tabPanel(title = "Transformed", 
                      DTOutput("transDataTable"),
@@ -117,6 +127,9 @@ ui <- dashboardPage(
                                     color = "success", size = "sm"),
                      )
             )
+          ),
+          box(title = "Levels of Facets", width = 12, DTOutput("FacetLevelTable")),
+            
           ),
         )
       ),
@@ -148,6 +161,7 @@ ui <- dashboardPage(
                      conditionalPanel(
                        condition = "input.mGtheory == 1",
                        uiOutput("selectedFixedFacet"),
+                       uiOutput("selectedFixedFacetWeights"),
                        uiOutput("selectedFacetWithUSComponent"), # facet with unstructured components
                        verbatimTextOutput("reportFacets"),
                      ),
@@ -473,6 +487,15 @@ server <- function(input, output, session) {
       write.csv(datTrans(), file, row.names = FALSE)
     }
   )
+  
+  ### Output facets' level table if any -----
+  output$FacetLevelTable <- renderDT({
+    n_levels_facets = unlist(lapply(dat(), \(x) n_distinct(x)))
+    data_frame(
+       Variable = colnames(dat()),
+       `Number of levels` = n_levels_facets
+    )
+  })
 
   ### Update UI for data confirm and switch to Tab page 2 -----
   observeEvent(input$dataConfirm, {
@@ -567,6 +590,16 @@ server <- function(input, output, session) {
         selected = selectedFacet()[1]
       )
     })
+    
+    # mgTheory选择fixed facet weights
+    output$selectedFixedFacetWeights <- renderUI({
+      textInput(
+        inputId = "selectedFixedFacetWeights",
+        label = "5. Select weigths for fixed facet:",
+        value = paste0(rep(1, n_distinct(dat[selectedFixedFacet()])), collapse = ";")
+      )
+    })
+    
     
     # mgTheory选择 facet with unstructured var-cov matrix
     output$selectedFacetWithUSComponent <- renderUI({
@@ -825,6 +858,7 @@ server <- function(input, output, session) {
     }
     
     if (input$mGtheory == FALSE) { # 分支1: 若為univariate gstudy
+      
       ####  glmer function ----------------------------------------
       if (input$selfFormular == "") { # 分支1.1.若用戶沒有自定義公式
         formulaRecomm <- as.formula(gtheoryFormula())
@@ -907,11 +941,10 @@ server <- function(input, output, session) {
         
         ## generalizability coefficient
         g_coef <- gCoef_mGTheory(
-          dat = datG[c(selectedID(), selectedFacet())],
-          nDimension = n_distinct(datG[selectedFixedFacet()]),
           glmmTMBObj = lmmFit,
           residual_cov = residual_cov,
-          person_ID = selectedID()
+          person_ID = selectedID(),
+          weights = input$selectedFixedFacetWeights
         )
         
         ###### --- 
@@ -993,7 +1026,21 @@ server <- function(input, output, session) {
     }else{
       # ongoing: placeholder for mgstudy boostrap
       bootCI_gstudy_res <- boot_gstudy_res
-      as.data.frame(bootCI_gstudy_res)
+      bootCI_gstudy_res = bootCI_gstudy_res |> 
+        as.data.frame() |> 
+        rownames_to_column("Components") |> 
+        filter(str_detect(Components, "Std.Dev|Cor")) |> 
+        separate(Components, into = c("VarCov", "Facet"), sep = "\\|") |> 
+        group_by(Facet) |> 
+        mutate(across(`2.5 %`:Estimate,  \(x) case_when(
+          str_detect(VarCov, "Cor.") ~ prod(x),
+          TRUE ~ x^2
+        ))) |> 
+        mutate(
+          VarCov = str_replace(VarCov, "Std.Dev", "Var"),
+          VarCov = str_replace(VarCov, "Cor", "Cov"),
+        )
+      
     }
   })
   
@@ -1045,7 +1092,7 @@ server <- function(input, output, session) {
       if (input$mGtheory == FALSE) {
         choices = selectedFacet()
       }else{
-        choices = setdiff(selectedFacet(), selectedFixedFacet())
+        choices = setdiff(c(selectedID(), selectedFacet()), selectedFixedFacet())
       }
       pickerInput(inputId = "FacetDStudySelector",
                   label = "Select facet:",
@@ -1054,10 +1101,9 @@ server <- function(input, output, session) {
     })
     
     #------------#
-    # Select number of conditions for target facet
+    # Select number of levels for target facets
     #------------#
     observeEvent(input$FacetDStudySelector, {
-      selectedFacetForDstudy <- selectedFacetForDstudy()
       ###### ---
       # Facet levels slider for selected Facet
       ###### ---
@@ -1065,9 +1111,9 @@ server <- function(input, output, session) {
         numericInput(
           inputId = "FacetValueSlider",
           label = "Enter number of conditions: ",
-          value = defaultN[selectedFacetForDstudy],
+          value = defaultN[selectedFacetForDstudy()],
           min = 0,
-          max = defaultN[selectedFacetForDstudy] * 10,
+          max = defaultN[selectedFacetForDstudy()] * 10,
           step = 10
         )
       })
@@ -1076,7 +1122,7 @@ server <- function(input, output, session) {
       # Facet levels range for dstudy plot
       ###### ---
       output$selectedMultipleFacetLevels <- renderUI({
-        startValue <- defaultN[selectedFacetForDstudy]
+        startValue <- defaultN[selectedFacetForDstudy()]
         endValue <- startValue*10
         textInput(
           inputId = "FacetValueRange",
@@ -1117,8 +1163,7 @@ server <- function(input, output, session) {
   #### button: confirm the facet levels  ----------------------------------------
   defaultN <- reactive({
     dat <- datNARemoved()
-    selectedFacet <- selectedFacet()
-    sapply(dat[selectedFacet], n_distinct)
+    sapply(dat[c(selectedID(), selectedFacet())], n_distinct)
   })
   
   observeEvent(input$variableSettingConfirm, {
@@ -1147,6 +1192,7 @@ server <- function(input, output, session) {
       ## gstudy results
       gstudy_res <- gstudyResult()$gstudy
       dstudy_res = dstudy(x = gstudy_res, n = updatedN, unit = selectedID())
+      
     }else{# 分支2: 若為multivariate gstudy,运行mdstudy
       gstudyVarCovMat <- gstudyResult()$VarComp
       facetName <- selectedFixedFacet()
@@ -1155,6 +1201,26 @@ server <- function(input, output, session) {
       dstudy_res = dstudy.VarCov(gstudyVarCovMat = gstudyVarCovMat,
                                  n = n,
                                  facetName = facetName)
+      
+      ## g-coefficient estimation: Extract variance and covariance 
+      person_cov = dstudy_res |> 
+        filter(Source == selectedID()) |> 
+        select(-Source, -Fixed.Facet) |> 
+        as.matrix()
+      
+      residual_cov = dstudy_res |> 
+        filter(Source == "Residual") |> 
+        select(-Source, -Fixed.Facet) |> 
+        as.matrix()
+      
+      dstudy_res = list(
+        VarCov = dstudy_res,
+        gCoef = gCoef_mGTheory(
+          residual_cov = residual_cov,
+          person_cov = person_cov,
+          weights = input$selectedFixedFacetWeights
+        )
+      )
     }
     
     dstudy_res
@@ -1204,7 +1270,7 @@ server <- function(input, output, session) {
   ### Run dstudy bootstrapping CI ----------------------------------------
   dstudyResultBootCI <- eventReactive(input$runDstudyBootButton, {
     
-    dstudy_res_boot <- dstudyResult() # placeholder using dstudy results
+    dstudy_res_boot <- dstudyResult()$VarCov # placeholder using dstudy results
     boot_iteration_raw <- dstudyResultBoot()
     
     dstudy.res.CI <- t(apply(boot_iteration_raw, 2, 
@@ -1241,7 +1307,8 @@ server <- function(input, output, session) {
     if(input$mGtheory == FALSE){
       print.dStudy(dstudyResult())
     }else{
-      print(dstudyResult())
+      print(dstudyResult()$VarCov)
+      print(paste0("g-coefficients: ", dstudyResult()$gCoef))
     }
   })
   output$recommModelDStudyBootResult <- renderPrint({dstudyResultBootCI()})
@@ -1314,7 +1381,7 @@ server <- function(input, output, session) {
   ## dstudy results
   output$downloadDstudyResult <- downloadHandler(
     filename = "dstudyResult.csv",
-    content = \(file) {write.csv(dstudyResult()$ds.df, file, row.names = FALSE)}
+    content = \(file) {write.csv(dstudyResult()$VarCov, file, row.names = FALSE)}
   )
   ## dstudy results bootstrapping
   output$downloadDstudyBootResult <- downloadHandler(

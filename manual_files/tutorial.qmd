@@ -1,0 +1,66 @@
+---
+title: "gTheoryShiny: An online application for interactive g-theory inference"
+shorttitle: gTheoryShiny tutorial
+author:
+  - name: Jihong Zhang
+    corresponding: true
+    orcid: 0000-0002-8393-5316
+    email: schneider@temple.edu
+    affiliations:
+      - name: Temple University
+        department: College of Education and Human Development
+        address: 358 Ritter Hall
+        city: Philadelphia
+        region: PA
+        postal-code: 19122-6091
+abstract: "This is my abstract."
+keywords: [keyword1, keyword2]
+format: 
+  apaquarto-pdf:
+    documentmode: man
+bibliography: references.bib
+---
+
+```{=tex}
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+```
+<!-- {{< include _extensions/wjschne/apaquarto/_apa_title.qmd >}} -->
+
+## Background
+
+Generalizability theory (g-theory) is a framework used to access the reliability, or dependability of measurements. The roots of g-theory can be found in classical test theory and analysis of variances (ANOVA). The core concepts of the generalizability theory are G studies (universes of admissible observations) and D studies (universes of generalization). G theory has been widely used in (1) reliability analysis, (2) optimal experimental or measurement design, (3) identification of measurement error sources. Multiple programs for generalizability theory are available, such as *EduG* [@cardinetApplyingGeneralizabilityTheory2011], *G_string*, *GENOVA*, *urGENOVA* and *mGENOVA*. In addition, G-theories analysis can also been performed in R language, using *gtheory* package and *lme4* package. However, none of those software is easily implemented using a interactive interface for users. Thus, to fill the gap, *gTheoryShiny* aims to provide a user-friendly program for data transformation, missing data imputation, inferences of univariate and multivariate generalizability theory, and visualizations.
+
+## Implementation
+
+### Overview of gTheoryShiny
+
+*gTheoryShiny* was developed with following R packages:
+
+-   *tidyverse* for data transformation and visualization;
+-   *lme4* for univriate generalizability theory model estimation;
+-   *glmmTMB* for multivariate generalizability theory (MGT) model estimation;
+-   *gtheory* for results compilation and print;
+-   *sjmisc* for facets' relationships detection;
+
+This program was wrapped by R/Shiny, a framework to build interactive web applications by R. By using these packages, *gTheoryShiny* could construct the g-studies and d-studies by the uploaded item responses from Excel file (.csv) or build-in R object, perform bootstrapped standard error, customize levels of facet for d-studies, and visualize reliability of d-studies. A flow chart of the proposed *gTheoryShiny* is shown in Fig. 1. *gTheoryShiny* is compatible with three major operating systems and popular browsers.
+
+### Data input
+
+*gTheoryShiny* currently supports two types of input:
+
+-   csv file with wide-format or long-format table for gtheory inferences. The wide-format data is an $(N + K) \times M$ matrix with discrete or continuous item scores, where N is the number of observables, K is the number of types of facets (e.g., items or raters), and M is the number of levels for combinations of facets.
+
+### g-theory model construction
+
+### Outcome inference
+
+## Results
+
+### Simulation data application
+
+## Conclusion
+
+\newpage
+
+# Reference

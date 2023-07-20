@@ -1,16 +1,15 @@
 ---
-title: "gTheoryShiny: An online application for interactive G-theory inference"
+title: "gTheoryShiny: An online application for interactive g-theory inference"
 author: "Jihong Zhang"
 format: 
   pdf:
     fig-pos: 'h'
     width: 80%
-editor: visual
 ---
 
-## Introduction
+## Background
 
-*`gTheoryShiny`* is an *`R/Shiny`* application for interactive construction, and inference of generalizability theory (also named G-theory) for performance assessment, which provide friendly GUI for users lacking of programming skills. It's heavely based on **lme4** (Bates et al., 2015) for multilevel modeling. To illustrate the functionality of this app, this manual is organized as following:
+*`gTheoryShiny`* is an *`R/Shiny`* application for interactive construction, and inferences of generalizability theory (also named G-theory) for performance assessment. It provides friendly user interface for users lacking of programming skills. It's heavily based on **lme4** (Bates et al., 2015) for multilevel modeling. To illustrate the functionality of this app, this manual is organized as following:
 
 -   Input section
 
@@ -32,7 +31,7 @@ Currently, the app also support .csv file. The data supported by gTheoryShiny ca
 
 #### Wide-format data
 
-If your data is wide-format, the app can help you transform the wide-format data into the long-format data. First, please make sure the first several rows of data include identifier of all facets (in the example table below, facets are *task1/task2* and *rater1/rater2*). Header is optional. If the data contains the header, check the box of *include header*. The first column of the data should be subject ID (*Person* in the table). Then, each row should represent each subject's all observations.
+If original input data is wide-format (each column represents each level of facets), this app can transform the raw data into a long-format data. First, please make sure the first several rows of data include identifier of all facets (in the example table below, facets are *task1/task2* and *rater1/rater2*). Header is optional. If the data contains the header, check the box of *include header*. The first column of the data should be subject ID (*Person* in the table). Then, each row should represent each subject's all observations.
 
 In addition, there are three settings you should fill in: (1) how many rows represent tag/ID, (2) the pre-fix of tag/ID, (3) column names of tag/ID in the transformed long-format data. For example, to transform table 1 to table 2, setting 1 is *2* (first two rows contains all facets' identifier), setting 2 can be *T;R* (the identifiers of facets have pre-fix T and R with the same order with the order of each facet's rows)*,* and setting 3 can be *Task;Rater* (in long-format, the column names of facets are Task and Rater in order).
 
@@ -108,3 +107,5 @@ After settings of d-study are finished, clicking *dstudy estimate* will provide 
 ![Screenshot of D-study output](images/paste-E1B8953B.png){fig.pos="b"}
 
 Similiar to G-study, to get boostrapping SD of d-study, click *bootstrap estimate* button. Finally, click *download* button to download results of D-study.
+
+## 3. Multivariate G-theory

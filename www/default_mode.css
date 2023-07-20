@@ -7,25 +7,18 @@ body {
 }
 
 /* Change header text to imported font */
-body { font-family: 'Roboto', sans-serif; font-family: 'Roboto Slab', serif; font-family: 'Noto Sans Mono', monospace;}
+h1 h2 h3 {
+  font-family: 'Roboto', sans-serif;
+  font-family: 'Roboto Slab', serif;
+}
+
+body { font-family: 'Roboto', sans-serif; font-family: 'Roboto Slab', serif;}
 
 #reportFacets {
             font-family: 'Roboto', 'Roboto Slab', sans-serif;
             font-size: 14px;
             }
-/* #recommModelDStudyResult {
-            font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
-            font-size: 14px;
-            }
-#recommModelDStudyBootResult {
-            font-family: "Helvetica Neue",Helvetica,Arial,sans-serif;
-            font-size: 14px;
-            } */
             
-h1 h2 h3 {
-  font-family: 'Roboto', sans-serif;
-  font-family: 'Roboto Slab', serif;
-}
 
 /* Make text visible on inputs */
 .shiny-input-container {
